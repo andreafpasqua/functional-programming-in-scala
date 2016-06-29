@@ -98,7 +98,7 @@ object Chapter4 {
 }
 
 object TestChapter4 extends App {
-
+  
   class Parent(val a: Int)
   class Child(override val a: Int) extends Parent(a)
 
