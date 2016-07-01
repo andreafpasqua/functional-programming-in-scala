@@ -7,7 +7,9 @@ object Chapter5 {
 
   sealed trait Stream[+T] {
     def head: T
+
     def tail: Stream[T]
+
     def isEmpty: Boolean
 
     def foldRight[Z](z: => Z)(op: (T, => Z) => Z): Z = this match {
@@ -20,13 +22,19 @@ object Chapter5 {
         (t, stream) => new Cons(() => op(t), () => stream)
       }
 
+    def map2[S](op: T => S): Stream[S] =
+      Stream.unfold(this) {
+        stream => stream.headOption.map {
+          h => (op(h), stream.tail)
+        }
+      }
+
     def filter(p: T => Boolean): Stream[T] =
       this.foldRight(Empty: Stream[T]) {
         (t, stream) =>
           if (p(t)) new Cons(() => t, () => stream)
           else stream
       }
-
 
     def append[S >: T](s2: Stream[S]): Stream[S] =
       this.foldRight(s2) {
@@ -47,16 +55,13 @@ object Chapter5 {
     def take(n: Int): Stream[T] =
       Stream.unfold((n, this)) {
         case (i, stream) =>
-           if ((i <= 0) || stream.isEmpty) None
-           else Some((stream.head, (i - 1, stream.tail)))
+          if ((i <= 0) || stream.isEmpty) None
+          else Some((stream.head, (i - 1, stream.tail)))
       }
 
     def drop(n: Int): Stream[T] =
-      if (n <= 0) this
-      else this match {
-        case Empty => this
-        case Cons(hd, tl) => tl().drop(n-1)
-      }
+      if ((n <= 0) || isEmpty) this
+      else this.tail.drop(n - 1)
 
     def dropWhile(p: T => Boolean): Stream[T] =
       this.foldRight(Empty: Stream[T]) {
@@ -64,12 +69,23 @@ object Chapter5 {
       }
 
     def takeWhile(p: T => Boolean): Stream[T] = {
-      this.foldRight{Empty: Stream[T]}{
+      this.foldRight {
+        Empty: Stream[T]
+      } {
         (t, z) =>
           if (p(t)) new Cons(() => t, () => z)
           else Empty
       }
     }
+
+    def takeWhile2(p: T => Boolean): Stream[T] =
+      Stream.unfold(this) {
+        stream => stream.headOption.flatMap {
+          h =>
+            if (p(h)) Some((h, stream.tail))
+            else None
+        }
+      }
 
     def headOption: Option[T] = this.foldRight(None: Option[T]) {
       (t, z) => Some(t)
@@ -80,6 +96,20 @@ object Chapter5 {
         (t, bool) => p(t) && bool
       }
 
+    def zipAll[S](other: Stream[S]): Stream[(Option[T], Option[S])] =
+      Stream.unfold((this, other)) {
+        case (s1, s2) =>
+          val h1 = s1.headOption
+          val h2 = s2.headOption
+          val newStatus1 = if (h1.isEmpty) this else this.tail
+          val newStatus2 = if (h2.isEmpty) other else other.tail
+          if (h1.isEmpty && h2.isEmpty) {
+            None
+          }
+          else {
+            Some(((h1, h2), (newStatus1, newStatus2)))
+          }
+      }
   }
 
   final class Cons[+T](val hd: () => T, val tl: () => Stream[T]) extends Stream[T] {
@@ -138,26 +168,36 @@ object TestChapter5 extends App {
   val stream4 = Chapter5.Stream.from(5)
   val stream5 = Chapter5.Stream.fibs
   val stream6 = Chapter5.Stream.ones
-  println(stream1.head)
-  println(stream1.tail.toList)
-  println(stream1.toList)
-  println(stream1.take(4).toList)
-  println(stream1.drop(3).toList)
-  println(stream1.dropWhile(_ <= 3).toList)
-  println(stream1.forAll(_ <= 3))
-  println(stream1.takeWhile(_ <= 3).toList)
-  println(stream1.headOption)
-  println(stream2.headOption)
-  println(stream1.map(_ * 2).toList)
-  println(stream2.map(_ * 2).toList)
-  println(stream1.filter(_ % 2 == 0).toList)
-  println(stream2.filter(_ % 2 == 0).toList)
-  println(stream1.append(stream1).toList)
-  println(stream2.append(stream1).toList)
-  println(stream1.flatMap(i => Chapter5.Stream(i, i, i)).toList)
-  println(stream3.take(10).toList)
-  println(stream4.take(10).toList)
-  println(stream5.take(10).toList)
-  println(stream6.take(6).toList)
+  println(s"Stream1 = ${stream1.toList}")
+  println(s"Stream2 = ${stream2.toList}")
+  println(s"Stream3 = ${stream3.take(5).toList}...")
+  println(s"Stream4 = ${stream4.take(5).toList}...")
+  println(s"Stream5 = ${stream5.take(5).toList}...")
+  println(s"Stream6 = ${stream6.take(5).toList}...")
+  println(s"The head of Stream1 is ${stream1.head}")
+  println(s"The tail of Stream1 is ${stream1.tail.toList}")
+  println(s"stream1.take(4) is ${stream1.take(4).toList}")
+  println(s"stream1.drop(3) is ${stream1.drop(3).toList}")
+  println(s"stream2.drop(3) is ${stream2.drop(3).toList}")
+  println(s"stream1.dropWhile(_ <= 3) is ${stream1.dropWhile(_ <= 3).toList}")
+  println(s"stream1.forAll(_ <= 3) is ${stream1.forAll(_ <= 3)}")
+  println(s"stream1.takeWhile(_ <= 3) is ${stream1.takeWhile(_ <= 3).toList}")
+  println(s"stream1.takeWhile2(_ <= 3) is ${stream1.takeWhile2(_ <= 3).toList}")
+  println(s"stream1.headOption is ${stream1.headOption}")
+  println(s"stream2.headOption is ${stream2.headOption}")
+  println(s"stream1.map(_ * 2) is ${stream1.map(_ * 2).toList}")
+  println(s"stream2.map(_ * 2) is ${stream2.map(_ * 2).toList}")
+  println(s"stream1.map2(_ * 2) is ${stream1.map2(_ * 2).toList}")
+  println(s"stream2.map2(_ * 2) is ${stream2.map2(_ * 2).toList}")
+  println(s"stream1.filter(_ % 2 == 0) is ${stream1.filter(_ % 2 == 0).toList}")
+  println(s"stream2.filter(_ % 2 == 0) is ${stream2.filter(_ % 2 == 0).toList}")
+  println(s"stream1.append(stream1) is ${stream1.append(stream1).toList}")
+  println(s"stream2.append(stream1) is ${stream2.append(stream1).toList}")
+  val printVal = stream1.flatMap(i => Chapter5.Stream(i, i, i)).toList
+  println(s"stream1.flatMap(i => Chapter5.Stream(i, i, i)) is $printVal")
+  println(s"stream3.take(10) is ${stream3.take(10).toList}")
+  println(s"stream4.take(10) is ${stream3.take(10).toList}")
+  println(s"stream5.take(10) is ${stream3.take(10).toList}")
+  println(s"stream6.take(6) is ${stream3.take(10).toList}")
 
 }
