@@ -161,12 +161,60 @@ object Chapter3 {
       }
     }
   }
+
+  sealed trait Tree[+A] {
+
+    def fold[B](z: B)(op: (A, B) => B, mergeOp: (B, B) => B): B =
+      this match {
+        case EmptyTree => z
+        case Leaf(value) => op(value, z)
+        case Branch(left, right) =>
+          mergeOp(
+            left.fold(z)(op, mergeOp),
+            right.fold(z)(op, mergeOp)
+          )
+      }
+
+    def size: Int =
+      this.fold(0)(
+        (a, sz) => 1,
+        (sz1, sz2) => sz1 + sz2 + 1
+      )
+
+    def depth: Int =
+      this.fold(0)(
+        (a, depth) => 1,
+        (depth1, depth2) => depth1.max(depth2) + 1
+      )
+
+    def map[B](op: A => B): Tree[B] =
+      this.fold(EmptyTree: Tree[B])(
+        (a, b) => Leaf(op(a)),
+        (tree1, tree2) => Branch(tree1, tree2)
+      )
+
+  }
+
+  object Tree {
+
+    def max(tree: Tree[Int]) =
+      tree.fold(0)(
+        (a: Int, z) => a,
+        (z1, z2) => z1.max(z2)
+      )
+
+  }
+
+  case object EmptyTree extends Tree[Nothing]
+  case class Branch[A](left: Tree[A], right: Tree[A]) extends Tree[A]
+  case class Leaf[A](value: A) extends Tree[A]
 }
 
 object TestChapter3 extends App {
 
   import Chapter3._
   import Chapter3.List._
+  import Chapter3.Tree._
   val list1 = List(1, 2, 3, 4, 5)
   val list2= List(1, 2, 0, 4)
   val res1 = list1 match {
@@ -194,4 +242,17 @@ object TestChapter3 extends App {
   println(s"list1.zipWith(list1)(_ + _) = ${list1.zipWith(list1)(_ + _)}")
   println(s"startsWith(List(1, 2, 3, 4, 5), List(1, 2, 3, 4)) = ${startsWith(List(1, 2, 3, 4, 5), List(1, 2, 3, 4))}")
   println(s"hasSubsequence(List(1, 2, 3, 4, 5), List(2, 3, 4)) = ${hasSubsequence(List(1, 2, 3, 4, 5), List(2, 3, 4))}")
+
+  val tree1 = Branch(
+    Branch(Leaf(1), Leaf(6)),
+    Branch(
+      Branch(Leaf(3), Leaf(4)),
+      Leaf(5)))
+
+  println(s"tree1 = $tree1")
+  println(s"tree1.size = ${tree1.size}")
+  println(s"tree1.depth = ${tree1.depth}")
+  println(s"tree1.map(_ * 2) = ${tree1.map(_ * 2)}")
+  println(s"max(tree1) = ${max(tree1)}")
+  println(s"max(tree1.map(_ * 2)) = ${max(tree1.map(_ * 2))}")
 }

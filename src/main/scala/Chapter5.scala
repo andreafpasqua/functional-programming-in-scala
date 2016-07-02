@@ -200,4 +200,6 @@ object TestChapter5 extends App {
   println(s"stream5.take(10) is ${stream3.take(10).toList}")
   println(s"stream6.take(6) is ${stream3.take(10).toList}")
 
+  val x = List(1, 2)
+  x.sum
 }
