@@ -103,13 +103,10 @@ object Chapter5 {
           val h2 = s2.headOption
           val newStatus1 = if (h1.isEmpty) this else this.tail
           val newStatus2 = if (h2.isEmpty) other else other.tail
-          if (h1.isEmpty && h2.isEmpty) {
-            None
-          }
-          else {
-            Some(((h1, h2), (newStatus1, newStatus2)))
-          }
+          if (h1.isEmpty && h2.isEmpty) None
+          else Some(((h1, h2), (newStatus1, newStatus2)))
       }
+
   }
 
   final class Cons[+T](val hd: () => T, val tl: () => Stream[T]) extends Stream[T] {
