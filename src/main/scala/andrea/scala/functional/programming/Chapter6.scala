@@ -1,3 +1,5 @@
+package andrea.scala.functional.programming
+
 /**
   * Created by andrea on 7/2/16.
   */
@@ -190,8 +192,8 @@ object Chapter6 {
 
 object TestChapter6 extends App {
 
-  import Chapter6._
   import Chapter6.Rand._
+  import Chapter6._
 
   val smallNum = 10
   val largeNum = 100

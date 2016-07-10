@@ -1,3 +1,5 @@
+package andrea.scala.functional.programming
+
 import scala.annotation.tailrec
 
 /**
@@ -212,9 +214,9 @@ object Chapter3 {
 
 object TestChapter3 extends App {
 
-  import Chapter3._
   import Chapter3.List._
   import Chapter3.Tree._
+  import Chapter3._
   val list1 = List(1, 2, 3, 4, 5)
   val list2= List(1, 2, 0, 4)
   val res1 = list1 match {

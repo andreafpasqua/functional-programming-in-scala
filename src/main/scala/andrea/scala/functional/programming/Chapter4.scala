@@ -1,3 +1,5 @@
+package andrea.scala.functional.programming
+
 /**
   * Created by andrea on 6/27/16.
   */
