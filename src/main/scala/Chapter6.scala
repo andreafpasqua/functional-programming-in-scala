@@ -177,15 +177,12 @@ object Chapter6 {
 
   object State {
 
-    def unit[S, A](a: A) = State((a, _))
+    def unit[S, A](a: A): State[S, A] = State((s: S) => (a, s))
 
-    def sequence[S, A](l: List[State[S, A]]): State[S, List[A]] = {
-      val newRun =
-        (s: S) => l.foldRight(unit(Nil: List[A])) {
-          (state1, state2) => state1.map2(state2)(_ :: _)
-        }
-      State(newRun)
-    }
+    def sequence[S, A](l: List[State[S, A]]): State[S, List[A]] =
+      l.foldRight(unit[S, List[A]](Nil)) {
+        (state1, state2) => state1.map2(state2)(_ :: _)
+      }
 
   }
 
