@@ -76,7 +76,7 @@ object Chapter7 {
 
   implicit class ParExtensions[A](par: Par[A]) {
 
-    def run(es: ExecutorService): A = par(es).get
+    def run(es: ExecutorService): Future[A] = par(es)
 
     def mapViaFlatMap[B](op: A => B): Par[B] = flatMap(a => Par.unit(op(a)))
 
@@ -98,7 +98,7 @@ object Chapter7 {
         map2Future(thisFut, otherFut, op)
       }
 
-    def flatMap[B](op: A => Par[B]): Par[B] = es => op(par.run(es))(es)
+    def flatMap[B](op: A => Par[B]): Par[B] = es => op(par.run(es).get)(es)
 
   }
 
@@ -134,7 +134,7 @@ object Chapter7 {
       key.flatMap(map)
 
     def join[A](pp: Par[Par[A]]): Par[A] =
-      es => pp.run(es)(es)
+      es => pp.run(es).get(es)
 
     def flatMapViaJoin[A, B](p: Par[A])(op: A => Par[B]): Par[B] =
       join(p.map(op))
@@ -168,6 +168,7 @@ object Chapter7 {
     }
 
   }
+
 }
 
 object TestChapter7 extends App {
@@ -180,7 +181,7 @@ object TestChapter7 extends App {
   val list1: List[Int] = (1 to 15).toList
   println(s"list1 = $list1 ")
 
-  println(s"**** list1.par7.map(_ + 1).run(es).get = ${list1.par7.map(_ + 1).run(es)}")
-  println(s"**** list1.par7.filter(_ % 2 == 0).run(es).get = ${list1.par7.filter(_ % 2 == 0).run(es)}")
+  println(s"**** list1.par7.map(_ + 1).run(es).get = ${list1.par7.map(_ + 1).run(es).get}")
+  println(s"**** list1.par7.filter(_ % 2 == 0).run(es).get = ${list1.par7.filter(_ % 2 == 0).run(es).get}")
 
 }
