@@ -151,4 +151,6 @@ object TestChapter4 extends App {
   val optionalListA3 = Chapter4.sequence2(optionList3)
 
   val temp = 1
+
+  List(1,2,3).sum
 }

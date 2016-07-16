@@ -98,6 +98,13 @@ object Chapter5 {
         (t, bool) => p(t) && bool
       }
 
+    def zip[S](other: Stream[S]): Stream[(T, S)] =
+      zipAll(other).flatMap{
+        case (Some(t), Some(s)) => Stream.cons((t, s), Empty)
+        case _ => Empty
+      }
+
+
     def zipAll[S](other: Stream[S]): Stream[(Option[T], Option[S])] =
       Stream.unfold((this, other)) {
         case (s1, s2) =>
@@ -200,5 +207,4 @@ object TestChapter5 extends App {
   println(s"stream6.take(6) is ${stream3.take(10).toList}")
 
   val x = List(1, 2)
-  x.sum
 }

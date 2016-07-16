@@ -65,63 +65,64 @@ object Chapter6 {
     }
   }
 
-  case class Rand[A](run: RNG => (A, RNG)) {
+  type Rand[A] = State[RNG, A]
+  case class RandOld[A](run: RNG => (A, RNG)) {
 
-    def flatMap[B](op: A => Rand[B]): Rand[B] = {
+    def flatMap[B](op: A => RandOld[B]): RandOld[B] = {
       val newStateChange =
         (rng: RNG) => {
           val (a, rng1) = this.run(rng)
           op(a).run(rng1)
         }
-      new Rand[B](newStateChange)
+      new RandOld[B](newStateChange)
     }
 
-    def map[B](op: A => B): Rand[B] =
+    def map[B](op: A => B): RandOld[B] =
       this.flatMap {
-        a: A => Chapter6.Rand.unit(op(a))
+        a: A => Chapter6.RandOld.unit(op(a))
       }
 
-    def map2[B, C](other: Rand[B])(op: (A, B) => C): Rand[C] =
+    def map2[B, C](other: RandOld[B])(op: (A, B) => C): RandOld[C] =
       this.flatMap {
         a: A =>
           other.map(op(a, _))
       }
 
-    def mapNoFlatMap[B](op: A => B): Rand[B] = {
+    def mapNoFlatMap[B](op: A => B): RandOld[B] = {
       val newStateChange =
         (rng: RNG) => {
           val (a, rng1) = this.run(rng)
           (op(a), rng1)
         }
-      new Rand[B](newStateChange)
+      new RandOld[B](newStateChange)
     }
 
-    def map2NoFlatMap[B, C](other: Rand[B])(op: (A, B) => C): Rand[C] = {
+    def map2NoFlatMap[B, C](other: RandOld[B])(op: (A, B) => C): RandOld[C] = {
       val newStateChange =
         (rng: RNG) => {
           val (a, rng1) = this.run(rng)
           val (b, rng2) = other.run(rng1)
           (op(a, b), rng2)
         }
-      new Rand[C](newStateChange)
+      new RandOld[C](newStateChange)
     }
 
     def apply(rng: RNG): A = run(rng)._1
 
   }
 
-  object Rand {
+  object RandOld {
 
-    def unit[A](a: A): Rand[A] = new Rand[A]((a, _))
+    def unit[A](a: A): RandOld[A] = new RandOld[A]((a, _))
 
-    def nonNegativeInt(n: Int): Rand[Int] = new Rand[Int](_.nonNegativeInt)
+    def nonNegativeInt(n: Int): RandOld[Int] = new RandOld[Int](_.nonNegativeInt)
 
-    def nonNegativeEven: Rand[Int] = {
-      val nonNegative: Rand[Int] = new Rand[Int](_.nonNegativeInt)
+    def nonNegativeEven: RandOld[Int] = {
+      val nonNegative: RandOld[Int] = new RandOld[Int](_.nonNegativeInt)
       nonNegative.map(i => i - i % 2)
     }
 
-    def nonNegativeLessThan(n: Int): Rand[Int] = {
+    def nonNegativeLessThan(n: Int): RandOld[Int] = {
       nonNegativeInt(n).flatMap {
         i =>
           val mod = i % n
@@ -132,28 +133,28 @@ object Chapter6 {
       }
     }
 
-    def int: Rand[Int] = new Rand[Int](_.nextInt)
+    def int: RandOld[Int] = new RandOld[Int](_.nextInt)
 
-    def double: Rand[Double] = {
-      val nonNegative: Rand[Int] = new Rand[Int](_.nonNegativeInt)
+    def double: RandOld[Double] = {
+      val nonNegative: RandOld[Int] = new RandOld[Int](_.nonNegativeInt)
       nonNegative.map(-_.toDouble / Int.MinValue)
     }
 
-    def both[A, B](ra: Rand[A], rb: Rand[B]): Rand[(A, B)] =
+    def both[A, B](ra: RandOld[A], rb: RandOld[B]): RandOld[(A, B)] =
       ra.map2(rb)((_, _))
 
-    def randIntDouble: Rand[(Int, Double)] = both(int, double)
+    def randIntDouble: RandOld[(Int, Double)] = both(int, double)
 
-    def randDoubleInt: Rand[(Double, Int)] = both(double, int)
+    def randDoubleInt: RandOld[(Double, Int)] = both(double, int)
 
-    def sequence[A](rl: List[Rand[A]]): Rand[List[A]] =
+    def sequence[A](rl: List[RandOld[A]]): RandOld[List[A]] =
       rl.foldRight(unit(Nil: List[A])) {
         (r, l) => r.map2(l)(_ :: _)
       }
 
     def ints(n: Int)(rng: RNG): List[Int] = sequence(List.fill(n)(int))(rng)
 
-    def rollDie: Rand[Int] = nonNegativeLessThan(6).map(_ + 1)
+    def rollDie: RandOld[Int] = nonNegativeLessThan(6).map(_ + 1)
 
   }
 
@@ -192,7 +193,7 @@ object Chapter6 {
 
 object TestChapter6 extends App {
 
-  import Chapter6.Rand._
+  import Chapter6.RandOld._
   import Chapter6._
 
   val smallNum = 10
@@ -259,12 +260,15 @@ object TestChapter6 extends App {
   }
 
   println(s"ints(10, rng1) = ${Chapter6.RNG.ints(10)(rng1)}")
-  println(s"ints(10, rng1) = ${Chapter6.Rand.ints(10)(rng1)}")
+  println(s"ints(10, rng1) = ${Chapter6.RandOld.ints(10)(rng1)}")
   println(s"rng1.nextInt = ${rng1.nextInt}")
   println(s"manyNonNegativeLessThan(rng1)= ${manyNonNegativeLessThan(rng1)}")
   println(
     s"sequence(List.fill(100)(rollDie))(rng1) = ${sequence(List.fill(100)(rollDie))(rng1)}"
   )
+
+  val list1 = List(1, 2, 3, 4)
+  println(list1.sum)
 
 }
 

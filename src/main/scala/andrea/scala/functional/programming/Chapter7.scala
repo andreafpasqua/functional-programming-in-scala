@@ -183,5 +183,4 @@ object TestChapter7 extends App {
 
   println(s"**** list1.par7.map(_ + 1).run(es).get = ${list1.par7.map(_ + 1).run(es).get}")
   println(s"**** list1.par7.filter(_ % 2 == 0).run(es).get = ${list1.par7.filter(_ % 2 == 0).run(es).get}")
-
 }
