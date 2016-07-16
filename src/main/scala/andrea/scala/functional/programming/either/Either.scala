@@ -1,6 +1,6 @@
 package andrea.scala.functional.programming.either
 
-import andrea.scala.functional.programming.list.Cons
+import andrea.scala.functional.programming.list.{List, Nil}
 /**
   * Created by andrea on 7/16/16.
   */
@@ -29,6 +29,16 @@ trait Either[+A, +B] {
       e2 <- other
     } yield op(e1, e2)
 
+}
+
+object Either {
+  // Exercise 4.7
+  def sequence[A, B](l: List[Either[A, B]]): Either[A, List[B]] =
+    traverse(l)(e => e)
+  def traverse[A, B, C](l: List[B])(op: B => Either[A, C]): Either[A, List[C]] =
+    l.foldRight(Right(Nil): Either[A, List[C]])(
+      (a, listOpt) => op(a).map2(listOpt)(_ :: _)
+    )
 }
 case class Left[A, B](get: A) extends Either[A, B]
 case class Right[A, B](get: B) extends Either[A, B]
