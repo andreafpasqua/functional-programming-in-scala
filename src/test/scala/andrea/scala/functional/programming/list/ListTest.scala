@@ -1,45 +1,82 @@
 package andrea.scala.functional.programming.list
 
 /**
-  * Created by andrea on 7/16/16.
+  * Created by andreapasqua on 10/01/2016.
   */
 object ListTest extends App {
   import List._
 
-  val list1 = List(1, 2, 3, 4, 5)
-  println(s"list1 = $list1")
-  val list2= List(1, 2, 0, 4)
-  println(s"list2 = $list2")
+  val listEmpty = List[Int]()
+  val listOne = List(1)
+  val listMultiple = List(1, 2, 3, 4, 5)
+  val listMultipleWithZero = List(1, 2, 0, 4, 5)
+  println("Test sum")
+  assert(listEmpty.sum == 0)
+  assert(listOne.sum == 1)
+  assert(listMultiple.sum == 15)
+  assert(listMultipleWithZero.sum == 12)
 
-  val res1 = list1 match {
-    case Cons(x, Cons(2, Cons(4, _))) => x
-    case Nil => 42
-    case Cons(x, Cons(y, Cons(3, Cons(4, _)))) => x + y
-    case Cons(h, t) => h + t.sum
-    case _ => 101
-  }
-  assert(res1 == 1 + 2, s"$res1 not equal to 1 + 2")
+  println("Test product")
+  assert(listEmpty.product == 1)
+  assert(listOne.product == 1)
+  assert(listMultiple.product == 120)
+  assert(listMultipleWithZero.product == 0)
 
-  println(s"list1.init = ${list1.init}")
+  println("Test fill")
+  assert(fill(5, "ciao") == List("ciao", "ciao", "ciao", "ciao", "ciao"))
 
-  println(s"List(1, 2, 3).foldRight(Nil: List[Int])(Cons(_, _)) = ${List(1, 2, 3).foldRight(Nil: List[Int])(Cons(_, _))}")
-  println(s"Nil.length = ${Nil.length}")
-  println(s"List(1, 2, 3).length = ${List(1, 2, 3).length}")
-  println(s"List(1, 2, 3).reverse = ${List(1, 2, 3).reverse}")
-  println(s"list1.append(list2) = ${list1.append(list2)}")
-  println(s"concatenate(List(list1, list2, list1)) = ${concatenate(List(list1, list2, list1))}")
-  println(s"list1.map(_ * 2) = ${list1.map(_ * 2)}")
-  println(s"list1.filter(_<=3) = ${list1.filter(_<=3)}")
-  println(s"list1.flatMap(i => List(i, i)) = ${list1.flatMap(i => List(i, i))}")
-  println(s"list1.zipWith(list1)(_ + _) = ${list1.zipWith(list1)(_ + _)}")
-  println(s"List(1, 2, 3, 4, 5).startsWith(List(1, 2, 3, 4)) = ${List(1, 2, 3, 4, 5).startsWith(List(1, 2, 3, 4))}")
-  println(s"list1.take(3) = ${list1.take(3)}")
-  println(s"list1.scanRight(0)(_ + _) = ${list1.scanRight(0)(_ + _)}")
-  println(s"list1.scanLeft(0)(_ + _) = ${list1.scanLeft(0)(_ + _)}")
-  println(s"hasSubsequence(List(1, 2, 3, 4, 5), List(2, 3, 4)) = ${List(1, 2, 3, 4, 5).hasSubsequence(List(2, 3, 4))}")
-  println(s"hasSubsequence(List(1, 2, 3, 4, 5), List(2, 3, 5)) = ${List(1, 2, 3, 4, 5).hasSubsequence(List(2, 3, 5))}")
-  println(s"hasSubsequence(List(), List(2, 3, 4)) = ${List().hasSubsequence(List(2, 3, 4))}")
-  println(s"hasSubsequence(List(), List()) = ${List().hasSubsequence(List())}")
-  println(s"list1.foldRightWithStopValue(1, 0, 0)(_ * _) = ${list1.foldRightWithStopValue(1, 0, 0)(_ * _)}")
-  println(s"list2.foldRightWithStopValue(1, 0, 0)(_ * _) = ${list2.foldRightWithStopValue(1, 0, 0)(_ * _)}")
+  println("Test tail")
+  assert(listOne.tail == Nil)
+  assert(listMultiple.tail == List(2, 3, 4, 5))
+
+  println("Test setHead")
+  assert(listEmpty.setHead(1) == List(1))
+  assert(listOne.setHead(2) == List(2))
+  assert(listMultiple.setHead(2) == List(2, 2, 3, 4, 5))
+
+  println("Test drop")
+  assert(listEmpty.drop(10) == Nil)
+  assert(listOne.drop(2) == Nil)
+  assert(listOne.drop(1) == Nil)
+  assert(listMultiple.drop(3) == List(4, 5))
+
+  println("Test dropWhile")
+  val pLess = (n: Int) => n <= 3
+  val pMore = (n: Int) => n > 3
+  assert(listEmpty.dropWhile(pLess) == Nil)
+  assert(listOne.dropWhile(pLess) == Nil)
+  assert(listMultiple.dropWhile(pLess) == List(4, 5))
+  assert(listMultiple.dropWhile(pMore) == listMultiple)
+
+  println("Test append")
+  assert(listEmpty.append(listMultiple) == listMultiple)
+  assert(listOne.append(listMultiple) == List(1, 1, 2, 3, 4, 5))
+  assert(listMultiple.append(listOne) == List(1, 2, 3, 4, 5, 1))
+  assert(listMultiple.append(listEmpty) == listMultiple)
+
+  println("Test init")
+  assert(listEmpty.init == listEmpty)
+  assert(listOne.init == listEmpty)
+  assert(listMultiple.init == List(1, 2, 3, 4))
+
+  println("Test foldRight")
+  assert(listEmpty.foldRight(1)(_ + _) == 1)
+  assert(listOne.foldRight(1)(_ + _) == 2)
+  assert(listMultiple.foldRight("")((n: Int, s: String) => n.toString + s) == "12345")
+  // Exercise 3.8
+  assert(listMultiple.foldRight(Nil.asInstanceOf[List[Int]])(Cons(_,_)) == listMultiple)
+
+  println("Test length")
+  assert(listEmpty.length == 0)
+  assert(listOne.length == 1)
+  assert(listMultipleWithZero.length == 5)
+
+
+  println("Test foldLeft")
+  assert(listEmpty.foldLeft(1)(_ + _) == 1)
+  assert(listOne.foldLeft(1)(_ + _) == 2)
+  assert(listMultiple.foldLeft("")((s: String, n: Int) => s + n.toString) == "12345")
+  // Continue HERE
+  assert(listMultiple.foldLeft(Nil.asInstanceOf[List[Int]])(Cons(_,_)) == listMultiple)
+
 }

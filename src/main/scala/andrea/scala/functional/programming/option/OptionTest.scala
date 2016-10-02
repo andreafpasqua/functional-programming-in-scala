@@ -1,7 +1,7 @@
 package andrea.scala.functional.programming.option
 
 import scala.util.Try
-import andrea.scala.functional.programming.list.List
+import andrea.scala.functional.programming.listold.List
 
 /**
   * Created by andrea on 7/16/16.
