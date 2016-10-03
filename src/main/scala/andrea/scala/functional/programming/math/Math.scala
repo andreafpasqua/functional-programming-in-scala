@@ -1,6 +1,7 @@
 package andrea.scala.functional.programming.math
 
 import scala.annotation.tailrec
+import andrea.scala.functional.programming.option.{Option, None, Some}
 
 /**
   * Created by andreapasqua on 10/01/2016.
@@ -22,5 +23,21 @@ object Math {
       else go(n - 1, last + previous, last)
     go(n, 1, 0)
   }
+
+  /**
+    * Computes the mean of a sequence. If the sequence is empty returns None
+    * Exercise 4.2
+    */
+  def mean(xs: Seq[Double]): Option[Double] = {
+    if (xs.isEmpty) None
+    else Some(xs.sum / xs.length)
+  }
+
+  /**
+    * Computes the mean of a sequence. If the sequence is empty returns None
+    * Exercise 4.2
+    */
+  def variance(xs: Seq[Double]): Option[Double] =
+    mean(xs).flatMap(mu => mean(xs.map(x => math.pow(x - mu, 2))))
 
 }

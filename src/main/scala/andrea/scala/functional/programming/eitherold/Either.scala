@@ -1,4 +1,4 @@
-package andrea.scala.functional.programming.either
+package andrea.scala.functional.programming.eitherold
 
 import andrea.scala.functional.programming.list.{List, Nil}
 /**

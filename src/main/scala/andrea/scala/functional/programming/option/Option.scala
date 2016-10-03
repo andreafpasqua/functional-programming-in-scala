@@ -1,67 +1,97 @@
 package andrea.scala.functional.programming.option
 
-import andrea.scala.functional.programming.list.{List, Nil}
 
 /**
-  * Created by andrea on 7/16/16.
+  * Created by andrea on 10/2/16.
   */
-trait Option[+A] {
-  // Exercise 4.1
-  def map[B](op: A => B): Option[B] = flatMap(a => Some(op(a)))
-  def flatMap[B](op: A => Option[B]): Option[B] =
-    this match {
-      case None => None
-      case Some(a) => op(a)
-    }
-  def getOrElse[B >: A](default: => B): B =
-    this match {
-      case None => default
-      case Some(a) => a
-    }
-  def orElse[B >: A](other: => Option[B]): Option[B] =
-    this match {
-      case None => other
-      case _ => this
-    }
-  def filter(predicate: A => Boolean): Option[A] =
-    flatMap(a => if (predicate(a)) Some(a) else None)
+sealed trait Option[+A] {
 
-  // Exercise 4.3
-  def map2[B, C](other: Option[B])(op: (A, B) => C): Option[C] =
-    flatMap(a => other.flatMap(b => Some(op(a, b))))
+  /**
+    * Maps the content of the option if any using f.
+    * Exercise 4.1
+    */
+  def map[B](f: A => B): Option[B] = this match {
+    case None => None
+    case Some(x) => Some(f(x))
+  }
+
+  /**
+    * Extracts the content of the option if any. If there is no content it
+    * returns the specified (and lazily evaluated) default value default
+    * Exercise 4.1
+    */
+  def getOrElse[B >: A](default: => B): B = this match {
+    case None => default
+    case Some(x) => x
+  }
+
+  /**
+    * maps the content of the option if any using f. f returns an
+    * optional value, so even if the original option had content, the
+    * application of f could result in None.
+    * Exercise 4.1
+    */
+  def flatMap[B](f: A => Option[B]): Option[B] = map(f).getOrElse(None)
+
+  /**
+    * Returns the option, but if it is empty it returns the lazily evaluated
+    * default option
+    * Exercise 4.1
+    */
+  def orElse[B >: A](op: => Option[B]): Option[B] = map(Some(_)).getOrElse(op)
+
+  /**
+    * Filters the content of the option if any using the predicate p.
+    * Exercise 4.1
+    */
+  def filter(p: A => Boolean) = flatMap(v => if (p(v)) Some(v) else None)
+
+  /**
+    * Combines two options using the function f that takes the possible content of
+    * the first option and the possible content of the other option. If either of them
+    * is empty, it returns None.
+    * Exercise 4.3
+    */
+  def map2[B, C](other: Option[B])(f: (A, B) => C): Option[C] =
+    flatMap(a => other.map(b => f(a, b)))
+
 }
 
 object Option {
 
-  // Exercise 4.2
-  implicit class VarianceSeqExt(xs: Seq[Double]) {
-    def mean: Option[Double] = {
-      val xsLen = xs.length
-      xsLen match {
-        case 0 => None
-        case len => Some(xs.sum / len)
-      }
+  /**
+    * Traverse a list and applies a function f to each value resulting in
+    * an optional list. If f returns None on any of the values in the list,
+    * then the method returns None
+    * Exercise 4.5
+    */
+  def traverse[A, B](as: List[A])(f: A => Option[B]): Option[List[B]] =
+    as.foldRight(Some(Nil):Option[List[B]])(
+      (a, op) => f(a).map2(op)((b, l) => b :: l)
+    )
+
+  /**
+    * Given a list of options, it returns an optional list of the values inside
+    * the options. If even one of the options is empty, it returns None.
+    * Exercise 4.5
+    */
+  def sequence[A](os: List[Option[A]]): Option[List[A]] =
+    traverse(os)(a => a)
+
+  /*************************OLDER IMPLEMENTATIONS OF ROUTINES
+    */
+
+  /**
+    * Given a list of options, it returns an optional list of the values inside
+    * the options. If even one of the options is empty, it returns None.
+    * Exercise 4.4
+    */
+  def sequenceNoTraverse[A](os: List[Option[A]]): Option[List[A]] =
+    os.foldRight(Some(Nil): Option[List[A]]){
+      (o, soFar) => o.map2(soFar)((a, l) => a :: l)
     }
-
-    def variance: Option[Double] =
-      mean.flatMap(m => xs.map(x => math.pow(x - m, 2)).mean)
-  }
-    // Exercise 4.4
-    def sequenceOld[A](l: List[Option[A]]): Option[List[A]] =
-      l.foldRight(Some(Nil): Option[List[A]])(
-        (aOpt, listOpt) => aOpt.map2(listOpt)(_ :: _)
-      )
-
-    // Exercise 4.5
-    def sequence[A](l: List[Option[A]]): Option[List[A]] =
-      traverse(l)(opt => opt)
-    def traverse[A, B](l: List[A])(op: A => Option[B]): Option[List[B]] =
-      l.foldRight(Some(Nil): Option[List[B]])(
-        (a, listOpt) => op(a).map2(listOpt)(_ :: _)
-      )
 
 }
 
 case object None extends Option[Nothing]
 case class Some[A](get: A) extends Option[A]
-
