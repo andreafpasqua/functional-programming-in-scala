@@ -1,6 +1,6 @@
 package andrea.scala.functional.programming.option
 
-import andrea.scala.functional.programming.listold.{List, Nil}
+import andrea.scala.functional.programming.list.{List, Nil}
 
 /**
   * Created by andrea on 7/16/16.

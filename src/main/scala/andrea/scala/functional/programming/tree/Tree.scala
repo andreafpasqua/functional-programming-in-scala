@@ -1,66 +1,94 @@
 package andrea.scala.functional.programming.tree
 
 /**
-  * Created by andrea on 7/15/16.
+  * Created by andrea on 10/2/16.
   */
 sealed trait Tree[+A] {
 
-  // Exercise 3.29
-  def fold[B](op: A => B)(combine: (B, B) => B): B =
-    this match {
-      case Leaf(a) => op(a)
-      case Branch(l, r) => combine(l.fold(op)(combine), r.fold(op)(combine))
-    }
-  def size: Int = fold[Int](_ => 1)(1 + _ + _)
-  def maximum[B >: A](implicit ord: Ordering[B]): B =
-    fold[B](b => b)((b1, b2) => if (ord.lteq(b1, b2)) b2 else b1)
-  def depth: Int = fold[Int](_ => 0)((b1, b2) => 1 + b1.max(b2))
-  def map[B](op: A => B): Tree[B] =
-    fold[Tree[B]](a => Leaf(op(a)))(Branch(_, _))
+  /**
+    * It traverses a tree, acting on each leaf with op and combine the left and right
+    * results at a branch with comb.
+    * Note that it is not tail recursive
+    * Exercise 3.29
+    */
+  def fold[B](op: A => B, comb: (B, B) => B): B = this match {
+    case Leaf(v) => op(v)
+    case Branch(l, r) => comb(l.fold(op, comb), r.fold(op, comb))
+  }
 
-  // Exercise 3.25
+  /**
+    * Computes the number of nodes in the tree, each branch and each leaf counts as 1.
+    * Note that this is not tail recursive
+    * Exercise 3.29
+    */
+  def size: Int = fold[Int](_ => 1, _ + _ + 1)
+
+  /** Computes the maximum value occurring at any leaf of a tree, for all classes
+    * that can be wrapped inside num.
+    * Note that this is not tail recursive
+    * Exercise 3.29
+    */
+  def maximum[B >: A](implicit num: Numeric[B]): B = fold[B]((a: A) => a, num.max)
+
+  /** Computes the maximum path length from the root to any leaf of a tree. For
+    * a single leaf it's 0.
+    * Note that this is not tail recursive
+    * Exercise 3.29
+    */
+  def depth: Int = fold[Int](_ => 0, _.max(_) + 1)
+
+  /**
+    * Transforms all values of the tree using the function f.
+    * Note that it is not tail recursive
+    * Exercise 3.29
+    */
+  def map[B](f: A => B): Tree[B] = fold[Tree[B]](v => Leaf(f(v)), Branch(_, _))
+
+
+  /************ OLDER VERSIONS OF ROUTINES
+    */
+
+  /**
+    * Computes the number of nodes in the tree, each branch and each leaf counts as 1.
+    * Note that this is not tail recursive
+    * Exercise 3.25
+    */
   def sizeNoFold: Int = this match {
     case Leaf(_) => 1
-    case Branch(l, r) => 1 + l.sizeNoFold + r.sizeNoFold
+    case Branch(l, r) => l.size + r.size + 1
   }
-  // Exercise 3.26
-  def maximumNoFold[B >: A] (implicit ord: Ordering[B]): B = this match {
-    case Leaf(a) => a
-    case Branch(l, r) =>
-      val lMax = l.maximumNoFold(ord)
-      val rMax = r.maximumNoFold(ord)
-      if (ord.lteq(lMax, rMax)) rMax else lMax
+
+  /** Computes the maximum value occurring at any leaf of a tree, for all classes
+    * that can be wrapped inside num.
+    * Note that this is not tail recursive
+    * Exercise 3.26
+    */
+  def maximumNoFold[B >: A](implicit num: Numeric[B]): B = this match {
+    case Leaf(v) => v
+    case Branch(l, r) => num.max(l.maximumNoFold(num), r.maximumNoFold(num))
   }
-  // Exercise 3.27
+
+  /** Computes the maximum path length from the root to any leaf of a tree. For
+    * a single leaf it's 0.
+    * Note that this is not tail recursive
+    * Exercise 3.27
+    */
   def depthNoFold: Int = this match {
     case Leaf(_) => 0
-    case Branch(l, r) => 1 + l.depthNoFold.max(r.depthNoFold)
+    case Branch(l, r) => l.depthNoFold.max(r.depthNoFold) + 1
   }
-  // Exercise 3.28
-  def mapNoFold[B](op: A => B): Tree[B] = this match {
-    case Leaf(a) => Leaf(op(a))
-    case Branch(l, r) => Branch(l.mapNoFold(op), r.mapNoFold(op))
+
+  /**
+    * Transforms all values of the tree using the function f.
+    * Note that it is not tail recursive
+    * Exercise 3.28
+    */
+  def mapNoFold[B](f: A => B): Tree[B] = this match {
+    case Leaf(v) => Leaf(f(v))
+    case Branch(l, r) => Branch(l.mapNoFold(f), r.mapNoFold(f))
   }
 
 }
 
 case class Leaf[A](value: A) extends Tree[A]
 case class Branch[A](left: Tree[A], right: Tree[A]) extends Tree[A]
-
-
-object TreeTest extends App {
-
-    val tree1 = Branch(
-      Branch(Leaf(1), Leaf(6)),
-      Branch(
-        Branch(Leaf(3), Leaf(4)),
-        Leaf(5)))
-
-    println(s"tree1 = $tree1")
-    println(s"tree1.size = ${tree1.size}")
-    println(s"tree1.depth = ${tree1.depth}")
-    println(s"tree1.map(_ * 2) = ${tree1.map(_ * 2)}")
-    println(s"tree1.maximum = ${tree1.maximum}")
-    println(s"tree1.map(_ * 2).maximum = ${tree1.map(_ * 2).maximum}")
-
-}
