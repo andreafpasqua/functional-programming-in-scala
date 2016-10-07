@@ -13,13 +13,13 @@ object StreamLogging extends App {
     */
 
   println("Use the debug versions to check lazy behavior")
-
-  println("*** Logs for constructor")
-  println("*** cons called")
-  val stream1: Stream[Int] = Stream(1, 2, 3)
+  lazy val thunk1 = {println("elem eval. =1"); 1}
+  lazy val thunk2 = {println("elem eval. =2"); 2}
+  lazy val thunk3 = {println("elem eval. =3"); 3}
+  val stream1: Stream[Int] = Stream.cons(thunk1, Stream.cons(thunk2, Stream.cons(thunk3, Stream.empty)))
 
   println("*** Logs for head and tail")
-  println("*** cons: head evaluated=1")
+  println("*** elem eval. =1")
   stream1.head
 
   println("*** cons called")

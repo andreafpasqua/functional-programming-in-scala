@@ -190,23 +190,4 @@ object Stream {
     new Cons(() => head, () => tail)
   }
 
-  /**
-    * Smart constructor. An auxiliary method for the main constructor.
-    * It is smart in that it caches values whose evaluation is forced.
-    * The head val is lazy and it is passed by name to Cons. This means
-    * that head is only evaluated when a method in Cons actually requires
-    * head. When that happens head is evaluated and cached and for that
-    * the thunk hd has to be computed for the first time. Likewise for tail
-    *
-    * @param hd head passed by name
-    * @param tl tail passed by name
-    */
-  def consWithLogs[T](hd: => T, tl: => Stream[T]): Stream[T] = {
-//  def cons[T](hd: => T, tl: => Stream[T]): Stream[T] = {
-    println("cons called")
-    lazy val head = {println(s"cons: head evaluated=$hd"); hd}
-    lazy val tail = {println(s"cons: tail evaluated=$tl"); tl}
-    new Cons(() => head, () => tail)
-  }
-
 }
