@@ -7,6 +7,7 @@ object StreamTest extends App {
 
   val streamEmpty = Stream[Int]()
   val streamOne = Stream(1)
+  val streamTwo = Stream(1, 2)
   val streamThree = Stream(1, 2, 3)
 
   def generateStreamFromThunks(is: List[Int]): Stream[Int] =
@@ -178,9 +179,44 @@ object StreamTest extends App {
   assert(Stream.unfold(0)(terminatingFunc).toList == List(0, 1, 2))
   assert(Stream.unfold(0)(nonTerminatingFunc).take(4).toList == List(0, 1, 2, 3))
 
+  println("Test zip")
+  assert(streamEmpty.zip(streamEmpty).isEmpty)
+  assert(streamEmpty.zip(streamThree).isEmpty)
+  assert(streamThree.zip(streamEmpty).isEmpty)
+  assert(streamThree.zip(streamThree).toList == List((1, 1), (2, 2), (3, 3)))
+  assert(streamTwo.zip(streamThree).toList == List((1, 1), (2, 2)))
+
+  println("Test zipWith")
+  def twoIntsToAString(i: Int, j: Int): String = (i + j).toString
+  assert(streamEmpty.zipWith(streamEmpty)(twoIntsToAString).isEmpty)
+  assert(streamEmpty.zipWith(streamThree)(twoIntsToAString).isEmpty)
+  assert(streamThree.zipWith(streamEmpty)(twoIntsToAString).isEmpty)
+  assert(streamThree.zipWith(streamThree)(twoIntsToAString).toList == List("2", "4", "6"))
+  assert(streamThree.zipWith(streamTwo)(twoIntsToAString).toList == List("2", "4"))
+
+  println("test zipAll")
+  assert(streamEmpty.zipAll(streamEmpty).isEmpty)
+  assert(streamEmpty.zipAll(streamThree).toList == List((None, Some(1)), (None, Some(2)), (None, Some(3))))
+  assert(streamThree.zipAll(streamEmpty).toList == List((Some(1), None), (Some(2), None), (Some(3), None)))
+  assert(streamThree.zipAll(streamThree).toList == List((Some(1), Some(1)), (Some(2), Some(2)), (Some(3), Some(3))))
+  assert(streamTwo.zipAll(streamThree).toList == List((Some(1), Some(1)), (Some(2), Some(2)), (None, Some(3))))
+
+  println("test zipWithAll")
+  def twoIntOpsToAString(op1: Option[Int], op2: Option[Int]): String = (op1, op2) match {
+    case (Some(i), Some(j)) => (i + j).toString
+    case (Some(i), _) => i.toString + " no j"
+    case (_, Some(j)) => j.toString + " no i"
+    case _ => "no ij"
+  }
+  assert(streamEmpty.zipWithAll(streamEmpty)(twoIntOpsToAString).isEmpty)
+  assert(streamEmpty.zipWithAll(streamThree)(twoIntOpsToAString).toList == List("1 no i", "2 no i", "3 no i"))
+  assert(streamThree.zipWithAll(streamEmpty)(twoIntOpsToAString).toList == List("1 no j", "2 no j", "3 no j"))
+  assert(streamThree.zipWithAll(streamThree)(twoIntOpsToAString).toList == List("2", "4", "6"))
+  assert(streamTwo.zipWithAll(streamThree)(twoIntOpsToAString).toList == List("2", "4", "3 no i"))
 
   def generateStreamFromThunks2(is: List[Int]): scala.collection.immutable.Stream[Int] =
     is.foldRight(scala.collection.immutable.Stream.empty[Int])(
       (i, list) =>scala.collection.immutable.Stream.cons[Int]({println(s"elem. eval.=$i"); i}, list)
     )
+
 }

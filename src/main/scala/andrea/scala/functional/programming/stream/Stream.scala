@@ -160,36 +160,30 @@ sealed trait Stream[+T] {
   /**
     * given two stream and a function f that takes optionally an element in the first stream and optionally
     * an element in the second stream, it constructs a stream with the transformed elements. If the two
-    * streams have different lengths the zipping continues when either one of the two lists is
-    * exhausted.
+    * streams have different lengths the zipping continues until the longer list is exhausted
     * Exercise 5.13
     */
   def zipWithAll[S, U](other: Stream[S])(f: (Option[T], Option[S]) => U): Stream[U] = Stream.unfold((this, other)) {
+    case (Cons(h1, t1), Cons(h2, t2)) => Some((f(Some(h1()), Some(h2())), (t1(), t2())))
+    case (Cons(h, t), _) => Some( f(Some(h()), None), (t(), Empty))
+    case (_, Cons(h, t)) => Some( f(None, Some(h())), (Empty, t()))
     case (Empty, Empty) => None
-    case (s1, s2) => Some((f(s1.headOption, s2.headOption), ))
-    case (s1, s2) => Some((f(h1(), h2()), (t1(), t2())))
-    case _ => None
   }
 
   /**
-    * Given two streams it constructs a new stream with the elemnts of the original stream tupled.
+    * Given two streams it constructs a new stream with the elements of the original stream tupled.
     * If the two streams have different lengths the zipping ends when either one of the two lists is
     * exhausted.
     */
   def zip[S](other: Stream[S]): Stream[(T, S)] = zipWith(other)((_, _))
 
   /**
-    * given two streams, it constructs a stream with tuples of corresponding elements from the
-    * two streams wrapped in options. If the two streams have different lengths the zipping
-    * continues but with Nones on the shorter side
+    * given two streams, it constructs a new stream with the elements of the original stream tupled.
+    * If the two streams have different lengths the zipping continues but with Nones on the shorter
+    * side
     * Exercise 5.13
     */
-  def zipAll[S](other: Stream[S]): Stream[(Option[T], Option[S])] = Stream.unfold((this, other)) {
-    case (Cons(h1, t1), Cons(h2, t2)) => Some((Some(h1()), Some(h2())), (t1(), t2()))
-    case (Cons(h, t), _) => Some((Some(h()), None), (t(), Stream.empty))
-    case (_, Cons(h, t)) => Some((None, Some(h())), (Stream.empty, t()))
-    case _ => None
-  }
+  def zipAll[S](other: Stream[S]): Stream[(Option[T], Option[S])] = zipWithAll(other)((op1, op2) => (op1, op2))
 
   /**************************** OLD IMPLEMENTATIONS OF ROUTINES
     *
