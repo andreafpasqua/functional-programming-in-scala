@@ -1,6 +1,6 @@
 package andrea.scala.functional.programming.math
 
-import andrea.scala.functional.programming.math.Math.{fib, mean, variance}
+import andrea.scala.functional.programming.math.Math._
 import andrea.scala.functional.programming.option.{None, Some}
 
 /**
@@ -8,10 +8,10 @@ import andrea.scala.functional.programming.option.{None, Some}
   * Created by andreapasqua on 10/01/2016.
   */
 object MathTest extends App {
-  println("Testing fib")
-  assert(fib(1) == 0)
-  assert(fib(2) == 1)
-  assert(fib(10) == 34)
+  println("Testing getFib")
+  assert(getFib(1) == 0)
+  assert(getFib(2) == 1)
+  assert(getFib(10) == 34)
 
   println("Testing mean and variance")
   val emptyVector: Vector[Double] = Vector()

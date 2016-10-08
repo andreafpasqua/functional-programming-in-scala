@@ -42,28 +42,57 @@ sealed trait Stream[+T] {
     * to the right. Note however that the function f takes the
     * second argument by name, so that the right substream
     * can be ignored if f doesn't need it
-    * @return
     */
   def foldRight[Z](z: => Z)(f: (T, => Z) => Z): Z = this match {
     case Empty => z
     case Cons(hd, tl) => f(hd(), tl().foldRight(z)(f))
   }
 
+  /**
+    * Maps all the elements of a stream using the function f. It
+    * uses foldRight so applies the function only as the next element
+    * is needed. However the first element is always needed.
+    * Exercise 5.7
+    */
   def map[S](f: T => S): Stream[S] = foldRight(Stream.empty[S])(
     (t, ss) => Stream.cons(f(t), ss)
   )
 
+  /**
+    * Filters the elements of a stream according to the predicate p. It
+    * uses foldRight so applies the filter only as the next element
+    * is needed. The first element however needs to be evaluated.
+    * Exercise 5.7
+    */
   def filter(p: T => Boolean): Stream[T] = foldRight(Stream.empty[T])(
     (t, tt) => if (p(t)) Stream.cons(t, tt) else tt
   )
 
+  /**
+    * Appends two streams. It uses foldRight so elements of either
+    * stream are accesses only as they become necessary.
+    * Exercise 5.7
+    */
   def append[TT >: T](other: => Stream[TT]): Stream[TT] = foldRight(other)(
     (t, tt) => Stream.cons(t, tt)
   )
 
+  /**
+    * Maps all the elements of a stream using the function f (which itself
+    * returns a stream) and then flattens together the various elements
+    * into a single of the stream. It uses foldRight so it applies the function
+    * only as needed.
+    * Exercise 5.7
+    */
   def flatMap[S](f: T => Stream[S]) = foldRight(Stream.empty[S])(
     (t, ss) => f(t).append(ss)
   )
+
+  /**
+    * Optionally returns the first element that satisfies the
+    * predicate p or None
+    */
+  def find(p: T => Boolean): Option[T] = filter(p).headOption
 
   /**
     * A method to extract the first n elements of a stream, without
@@ -83,11 +112,12 @@ sealed trait Stream[+T] {
     * up until and excluding the first element for which the predicate
     * p is false. It forces evaluation of the elements, in order to
     * compute the predicate.
-    * Exercise 5.5
+    * Exercise 5.13
     */
-  def takeWhile(p: T => Boolean): Stream[T] = foldRight(Empty: Stream[T])(
-    (t, s) => if (p(t)) Stream.cons(t, s) else Stream.empty
-  )
+  def takeWhile(p: T => Boolean): Stream[T] = Stream.unfold(this) {
+    case Cons(hd, tl) if p(hd()) => Some((hd(), tl()))
+    case _ => None
+  }
 
   /**
     * A method to drop the first n elements of a stream, without
@@ -115,6 +145,52 @@ sealed trait Stream[+T] {
     */
   def forall(p: T => Boolean): Boolean = foldRight(true)((t, bool) => p(t) && bool)
 
+  /**
+    * given two stream and a function f that takes an element in the first stream and an element
+    * in the second stream, it constructs a stream with the transformed elements. If the two
+    * streams have different lengths the zipping ends when either one of the two lists is
+    * exhausted.
+    * Exercise 5.13
+    */
+  def zipWith[S, U](other: Stream[S])(f: (T, S) => U): Stream[U] = Stream.unfold((this, other)) {
+    case (Cons(h1, t1), Cons(h2, t2)) => Some((f(h1(), h2()), (t1(), t2())))
+    case _ => None
+  }
+
+  /**
+    * given two stream and a function f that takes optionally an element in the first stream and optionally
+    * an element in the second stream, it constructs a stream with the transformed elements. If the two
+    * streams have different lengths the zipping continues when either one of the two lists is
+    * exhausted.
+    * Exercise 5.13
+    */
+  def zipWithAll[S, U](other: Stream[S])(f: (Option[T], Option[S]) => U): Stream[U] = Stream.unfold((this, other)) {
+    case (Empty, Empty) => None
+    case (s1, s2) => Some((f(s1.headOption, s2.headOption), ))
+    case (s1, s2) => Some((f(h1(), h2()), (t1(), t2())))
+    case _ => None
+  }
+
+  /**
+    * Given two streams it constructs a new stream with the elemnts of the original stream tupled.
+    * If the two streams have different lengths the zipping ends when either one of the two lists is
+    * exhausted.
+    */
+  def zip[S](other: Stream[S]): Stream[(T, S)] = zipWith(other)((_, _))
+
+  /**
+    * given two streams, it constructs a stream with tuples of corresponding elements from the
+    * two streams wrapped in options. If the two streams have different lengths the zipping
+    * continues but with Nones on the shorter side
+    * Exercise 5.13
+    */
+  def zipAll[S](other: Stream[S]): Stream[(Option[T], Option[S])] = Stream.unfold((this, other)) {
+    case (Cons(h1, t1), Cons(h2, t2)) => Some((Some(h1()), Some(h2())), (t1(), t2()))
+    case (Cons(h, t), _) => Some((Some(h()), None), (t(), Stream.empty))
+    case (_, Cons(h, t)) => Some((None, Some(h())), (Stream.empty, t()))
+    case _ => None
+  }
+
   /**************************** OLD IMPLEMENTATIONS OF ROUTINES
     *
     */
@@ -135,6 +211,42 @@ sealed trait Stream[+T] {
   def takeWhileNoFoldRight(p: T => Boolean): Stream[T] = this match {
     case Cons(hd, tl) if p(hd()) => Stream.cons(hd(), tl().takeWhileNoFoldRight(p))
     case _ => Stream.empty
+  }
+
+
+  /**
+    * Extracts a substream consisting of all the elements of a stream
+    * up until and excluding the first element for which the predicate
+    * p is false. It forces evaluation of the elements, in order to
+    * compute the predicate.
+    * Exercise 5.5
+    */
+  def takeWhileFoldRight(p: T => Boolean): Stream[T] = foldRight(Empty: Stream[T])(
+    (t, s) => if (p(t)) Stream.cons(t, s) else Stream.empty
+  )
+
+  /**
+    * A method to extract the first n elements of a stream, without
+    * evaluating them. if the stream is longer than n, it is returned
+    * in its entirety. If n < 1, an empty stream is returned. Not that
+    * the unapply method returns Func0 parameters, so no evaluation
+    * takes place upon unapplying.
+    * Exercise 5.13
+    */
+  def takeUnfold(n: Int): Stream[T] = Stream.unfold((n, this)) {
+    case (i, Cons(hd, tl)) if i > 0 => Some((hd(), (i - 1, tl())))
+    case _ => None
+  }
+
+  /**
+    * Maps all the elements of a stream using the function f. It
+    * uses foldRight so applies the function only as the next element
+    * is needed. However the first element is always needed.
+    * Exercise 5.13
+    */
+  def mapUnfold[S](f: T => S): Stream[S] = Stream.unfold(this){
+    case Cons(hd, tl) => Some((f(hd()), tl()))
+    case _ => None
   }
 
 }
@@ -189,5 +301,55 @@ object Stream {
     lazy val tail = tl
     new Cons(() => head, () => tail)
   }
+
+  /**
+    * Generates an infinite stream of identical values t. Note
+    * that this works better than cons(a, constant(a)) because
+    * instead of keeping calling the same function, it calls a
+    * lazily evaluated val.
+    * Exercise 5.8
+    */
+  def constant[T](t: T): Stream[T] = {
+    lazy val stream: Stream[T] = Cons(() => t, () => stream)
+    stream
+  }
+
+  /**
+    * Generates an infinite stream as follows n, n+1, n+2 and so on, starting
+    * at the parameter n.
+    * Exercise 5.12
+    */
+  def from(n: Int): Stream[Int] = unfold(n)(n => Some((n, n + 1)))
+
+  /**
+    * Generates a stream by starting with a state s, applying to it
+    * a function f that generates a value and a new state and iterate
+    * the process. If the function returns None, then the stream terminates
+    *
+    * @return
+    */
+  def unfold[T, S](s: S)(f: S => Option[(T, S)]): Stream[T] =
+    f(s).map {
+      case (t, newS) => cons(t, unfold(newS)(f))
+    }.getOrElse(empty)
+
+  /**************************** OLD IMPLEMENTATIONS OF ROUTINES
+    *
+    */
+  /**
+    * Generates an infinite stream of identical values t. Note
+    * that this works better than cons(a, constant(a)) because
+    * instead of keeping calling the same function, it calls a
+    * lazily evaluated val.
+    * Exercise 5.12
+    */
+  def constantOld[T](t: T): Stream[T] = unfold[T, T](t)(s => Some((s, s)))
+
+  /**
+    * Generates an infinite stream as follows n, n+1, n+2 and so on, starting
+    * at the parameter n.
+    * Exercise 5.9
+    */
+  def fromOld(n: Int): Stream[Int] = cons(n, fromOld(n + 1))
 
 }

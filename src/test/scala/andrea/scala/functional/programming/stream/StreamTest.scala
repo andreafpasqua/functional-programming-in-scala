@@ -98,4 +98,89 @@ object StreamTest extends App {
   println("*** elem eval.=2")
   stream8.foldRight(0)(foldRightFunc) // foldRightFunction stops the recursion if i==2, so only two elements evaluated
 
+  println("Test map")
+  assert(streamEmpty.map(_ * 2).toList.isEmpty)
+  assert(streamThree.map(_ * 2).toList == List(2, 4, 6))
+  // logs
+  val stream9: Stream[Int] = generateStreamFromThunks(List(1, 2, 3, 4))
+  println("*** elem eval.=1") // mapping requires the first element of the stream to be evaluated
+  val mappedStream = stream9.map((n: Int) => {println(s"map($n)"); n * 2})
+  println("*** map(1)")
+  mappedStream.head
+  println("*** elem eval.=2")
+  mappedStream.tail
+  println("*** map(2)")
+  mappedStream.tail.head
+
+  println("Test filter")
+  assert(streamEmpty.filter(_ != 2).toList.isEmpty)
+  assert(streamThree.filter(_ != 2).toList == List(1, 3))
+  // logs
+  val stream10: Stream[Int] = generateStreamFromThunks(List(1, 2, 3, 4))
+  println("*** elem eval.=1") // filtering requires the first element of the stream to be evaluated
+  println("*** filter(1)")
+  val filteredStream = stream10.filter((n: Int) => {println(s"filter($n)"); n != 2})
+  filteredStream.head
+  println("*** elem eval.=2")
+  println("*** filter(2)")
+  println("*** elem eval.=3")
+  println("*** filter(3)")
+  filteredStream.tail
+  filteredStream.tail.head
+
+  println("Test flatmap")
+  def intToStreamTwice(n: Int) = Stream.cons(n, Stream.cons(n, Stream.empty))
+  def intToStreamTwiceWithLogging(n: Int) = {println(s"flatMap($n)"); intToStreamTwice(n)}
+  assert(streamEmpty.flatMap(intToStreamTwice).isEmpty)
+  assert(streamThree.flatMap(intToStreamTwice).toList == List(1, 1, 2, 2, 3, 3))
+  // logs
+  val stream11 = generateStreamFromThunks(List(1, 2, 3, 4))
+  println("*** elem eval.=1") // filtering requires the first element of the stream to be evaluated
+  println("*** flatMap(1)")
+  val flatMappedStream = stream11.flatMap(intToStreamTwiceWithLogging)
+  flatMappedStream.head
+  flatMappedStream.tail
+  flatMappedStream.tail.head
+  println("*** elem eval.=2")
+  println("*** flatMap(2)")
+  flatMappedStream.tail.tail.head
+
+  println("Test append")
+  assert(streamEmpty.append(streamEmpty).isEmpty)
+  assert(streamEmpty.append(streamThree).toList == List(1, 2, 3))
+  assert(streamThree.append(streamEmpty).toList == List(1, 2, 3))
+  assert(streamThree.append(streamThree).toList == List(1, 2, 3, 1, 2, 3))
+  // logs
+  val stream12a = generateStreamFromThunks(List(1, 2))
+  val stream12b = generateStreamFromThunks(List(1, 2))
+  println("*** elem eval.=1")
+  val stream12 = stream12a.append(stream12b) // appending requires the first element of the stream to be evaluated
+  stream12.head
+  println("*** elem eval.=2")
+  stream12.tail
+  stream12.tail.head
+
+  println("Test find")
+  assert(streamEmpty.find(_ == 2).isEmpty)
+  assert(streamThree.find(_ == 2).get == 2)
+  assert(streamThree.find(_ > 3).isEmpty)
+
+
+  println("Test constant")
+  assert(Stream.constant("a").take(4).toList == List.fill(4)("a"))
+
+  println("Test from")
+  assert(Stream.from(3).take(4).toList == List(3, 4, 5, 6))
+
+  println("Test unfold")
+  def terminatingFunc(n: Int): Option[(Int, Int)] = if (n == 3) None else Some(n, n + 1)
+  def nonTerminatingFunc(n: Int): Option[(Int, Int)] = Some(n, n + 1)
+  assert(Stream.unfold(0)(terminatingFunc).toList == List(0, 1, 2))
+  assert(Stream.unfold(0)(nonTerminatingFunc).take(4).toList == List(0, 1, 2, 3))
+
+
+  def generateStreamFromThunks2(is: List[Int]): scala.collection.immutable.Stream[Int] =
+    is.foldRight(scala.collection.immutable.Stream.empty[Int])(
+      (i, list) =>scala.collection.immutable.Stream.cons[Int]({println(s"elem. eval.=$i"); i}, list)
+    )
 }
