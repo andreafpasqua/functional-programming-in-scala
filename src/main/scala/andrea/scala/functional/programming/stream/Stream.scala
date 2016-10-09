@@ -191,12 +191,15 @@ sealed trait Stream[+T] {
   def hasSubsequence[TT >: T](subStream: Stream[TT]): Boolean = tails.exists(_.startsWith(subStream))
 
 
+  /**
+    * It acts like foldRight and with the same arguments, but it saves all partial results
+    * in a stream
+    */
   def scanRight[Z](z: Z)(f: (T, => Z) => Z): Stream[Z] = foldRight((z, Stream(z))){
-    case (t, tuple) => {
+    case (t, tuple) =>
       lazy val tupleCached = tuple
       val newZ = f(t, tupleCached._1)
       (newZ, Stream.cons(newZ, tupleCached._2))
-    }
   }._2
 
   /**
