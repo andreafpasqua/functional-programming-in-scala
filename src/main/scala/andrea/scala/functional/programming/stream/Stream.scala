@@ -171,6 +171,35 @@ sealed trait Stream[+T] {
   }
 
   /**
+    * Returns true of the stream begins with subStream, else it returns false
+    * Exercise 5.14
+    */
+  def startsWith[TT >: T](subStream: Stream[TT]): Boolean = zipAll(subStream).takeWhile(_._2.nonEmpty)
+    .forall(tuple => tuple._1 == tuple._2)
+
+  /**
+    * Returns a stream containing all the tails of the given stream. A tail of a stream would be the
+    * stream obtained by dropping some elements at the front
+    * Exercise 5.15
+    */
+  def tails: Stream[Stream[T]] = Stream.cons(this, Stream.unfold(this)(
+    stream => if (stream.isEmpty) None else Some((stream.tail, stream.tail))))
+
+  /**
+    * Returns true if subStream is a substream of the main stream, else it returns false
+    */
+  def hasSubsequence[TT >: T](subStream: Stream[TT]): Boolean = tails.exists(_.startsWith(subStream))
+
+
+  def scanRight[Z](z: Z)(f: (T, => Z) => Z): Stream[Z] = foldRight((z, Stream(z))){
+    case (t, tuple) => {
+      lazy val tupleCached = tuple
+      val newZ = f(t, tupleCached._1)
+      (newZ, Stream.cons(newZ, tupleCached._2))
+    }
+  }._2
+
+  /**
     * Given two streams it constructs a new stream with the elements of the original stream tupled.
     * If the two streams have different lengths the zipping ends when either one of the two lists is
     * exhausted.

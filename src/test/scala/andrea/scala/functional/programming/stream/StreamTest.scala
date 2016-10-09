@@ -201,7 +201,7 @@ object StreamTest extends App {
   assert(streamThree.zipAll(streamThree).toList == List((Some(1), Some(1)), (Some(2), Some(2)), (Some(3), Some(3))))
   assert(streamTwo.zipAll(streamThree).toList == List((Some(1), Some(1)), (Some(2), Some(2)), (None, Some(3))))
 
-  println("test zipWithAll")
+  println("Test zipWithAll")
   def twoIntOpsToAString(op1: Option[Int], op2: Option[Int]): String = (op1, op2) match {
     case (Some(i), Some(j)) => (i + j).toString
     case (Some(i), _) => i.toString + " no j"
@@ -213,6 +213,21 @@ object StreamTest extends App {
   assert(streamThree.zipWithAll(streamEmpty)(twoIntOpsToAString).toList == List("1 no j", "2 no j", "3 no j"))
   assert(streamThree.zipWithAll(streamThree)(twoIntOpsToAString).toList == List("2", "4", "6"))
   assert(streamTwo.zipWithAll(streamThree)(twoIntOpsToAString).toList == List("2", "4", "3 no i"))
+
+  println("Test startsWith")
+  assert(streamEmpty.startsWith(streamEmpty))
+  assert(!streamEmpty.startsWith(streamThree))
+  assert(streamThree.startsWith(streamEmpty))
+  assert(streamThree.startsWith(streamTwo))
+  assert(!streamTwo.startsWith(streamThree))
+
+  println("Test tails")
+  assert(streamEmpty.tails.toList.map(_.toList) == List(Nil))
+  assert(streamThree.tails.toList.map(_.toList) == List(List(1, 2, 3), List(2, 3), List(3), Nil))
+
+  println("Test scanRight")
+  assert(streamEmpty.scanRight(0)(_ + _).toList == List(0))
+  assert(streamThree.scanRight(0)(_ + _).toList == List(6, 5, 3, 0))
 
   def generateStreamFromThunks2(is: List[Int]): scala.collection.immutable.Stream[Int] =
     is.foldRight(scala.collection.immutable.Stream.empty[Int])(
