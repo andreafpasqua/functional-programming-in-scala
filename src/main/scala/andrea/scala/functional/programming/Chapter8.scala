@@ -1,20 +1,20 @@
 package andrea.scala.functional.programming
 
-import andrea.scala.functional.programming.Chapter6.{RNG, SimpleRNG, State}
+import andrea.scala.functional.programming.state.{RandState, SimpleRandomState, StateAction}
 import andrea.scala.functional.programming.Chapter8.Prop.{Falsified, Passed, Result}
-import andrea.scala.functional.programming.Chapter5.Stream
 import andrea.scala.functional.programming.Chapter8.Gen
-
+import andrea.scala.functional.programming.stream.Stream
+import andrea.scala.functional.programming.stream.Stream.unfold
 /**
   * Created by andrea on 7/10/16.
   */
 object Chapter8 {
 
-  case class Gen[A](sample: State[RNG, A]) {
+  case class Gen[A](sample: StateAction[RandState, A]) {
     def forAll(predicate: A => Boolean): Prop =
       Prop {
         (_, testCases, rng) => {
-          val stream = Stream.unfold(rng)(rng => Some(sample.run(rng)))
+          val stream = unfold(rng)(rng => Some(sample.run(rng)))
           val streamWithCounts = stream.zip(Stream.from(0)).take(testCases)
           val firstFailure = streamWithCounts.filter {
             case (a, _) => !predicate(a)
@@ -90,25 +90,25 @@ object Chapter8 {
   object Gen {
     // Exercise 8.4
     def choose(start: Int, stopExclusive: Int): Gen[Int] =
-      Gen(new State(_.nextInt))
+      Gen(StateAction(_.nextInt))
 
     // Exercise 8.5
-    def unit[A](a: A): Gen[A] = Gen(State.unit(a))
+    def unit[A](a: A): Gen[A] = Gen(StateAction.unit(a))
 
     def boolean: Gen[Boolean] = {
-      val state = new State[RNG, Int](_.nextInt).map { i => if (i < 0) false else true }
+      val state = new StateAction[RandState, Int](_.nextInt).map { i => if (i < 0) false else true }
       Gen(state)
     }
 
     def double: Gen[Double] =
-      Gen(new State[RNG, Double](_.double))
+      Gen(StateAction[RandState, Double](_.nextDouble))
 
     // Exercise 8.12
     def listOf[A](g: Gen[A]): SGen[List[A]] =
       SGen(i => g.listOfN(Gen.unit(i)))
 
     def listOfN[A](n: Int, g: Gen[A]): Gen[List[A]] = {
-      val states = State.sequence(List.fill(n)(g.sample))
+      val states = StateAction.sequence(List.fill(n)(g.sample))
       Gen(states)
     }
 
@@ -116,7 +116,7 @@ object Chapter8 {
 
   }
 
-  case class Prop(run: (Prop.MaxSize, Prop.TestCases, RNG) => Prop.Result) {
+  case class Prop(run: (Prop.MaxSize, Prop.TestCases, RandState) => Prop.Result) {
     // Exercise 8.9
     def &&(other: Prop): Prop = Prop {
       (maxSize, testCases, rng) => {
@@ -146,7 +146,7 @@ object Chapter8 {
     def run(p: Prop,
             maxSize: Int = 100,
             testCases: Int = 100,
-            rng: RNG = SimpleRNG(System.currentTimeMillis())): Unit =
+            rng: RandState = SimpleRandomState(System.currentTimeMillis())): Unit =
       p.run(maxSize, testCases, rng) match {
         case Falsified(msg, counts) =>
           println(s"! Falsified after $counts passed tests:\n $msg")
