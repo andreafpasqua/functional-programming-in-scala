@@ -68,21 +68,64 @@ object Par {
     */
   def asyncF[T, S](f: T => S): T => Par[S] = t => lazyUnit(f(t))
 
+  /**
+    * given a list of parallel computation returns a computation for the list of values.
+    * REVISIT THIS
+    * Exercise 7.5
+    */
+  def sequence[T](pars: List[Par[T]]): Par[List[T]] = pars.foldRight(Par.unit[List[T]](Nil))(
+    (par, parList) => par.map2(parList)(_ :: _)
+  )
+
+
+  implicit class ParExtensions[T](l: List[T]) {
+
+    def par: ParList = ParList(l)
+
+    case class ParList(list: List[T]) {
+
+      /**
+        * given a ParList object applies the function f in parallel.
+        */
+      def map[S](f: T => S): Par[List[S]] = sequence(list.map(asyncF(f)))
+
+      /**
+        * filters a list in parallel given a predicate p.
+        * Exercise 7.6
+        */
+      def filter(p: T => Boolean): Par[List[T]] = map(t => if (p(t)) Some(t) else None).map(_.flatten)
+
+
+    }
+
+  }
+
 }
 
 class ExecutorService {
 
+  private val numThreads: Int = 10
+  var threadsOpen: Array[Boolean] = Array.fill(numThreads)(true)
+
   /**
     * This assigns a thunk to a logical thread for execution
     */
-  def submit[T](t: => T): Future[T] = ???
+  def submit[T](t: => T): Future[T] = {
+    threadsOpen.indexWhere(identity) match {
+      case -1 => submit(t)
+      case n =>
+        println(s"Evaluating in thread $n")
+        threadsOpen(n) = false
+        val ret = UnitFuture(t)
+        threadsOpen(n) = true
+        ret
+    }
+  }
 
 }
 
 /**
   * This contains a logical thread for execution
-  *
-  * @tparam T
   */
 trait Future[+T] {
 
@@ -127,7 +170,7 @@ case class PairedFutures[T, S](fut1: Future[T], fut2: Future[S]) extends Future[
 
   def get(timeout: Duration): (T, S) = cache match {
     case Some(ret) => ret
-    case None => {
+    case None =>
       val startTime: Long = System.nanoTime()
       val t = fut1.get(timeout)
       val timeElapsed = Duration(System.nanoTime() - startTime, TimeUnit.NANOSECONDS)
@@ -135,7 +178,6 @@ case class PairedFutures[T, S](fut1: Future[T], fut2: Future[S]) extends Future[
       val ret = (t, s)
       cache = Some(ret)
       ret
-    }
   }
 
   def cancel(evenIfRunning: Boolean): Boolean = fut1.cancel(evenIfRunning) || fut2.cancel(evenIfRunning)
