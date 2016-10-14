@@ -1,5 +1,7 @@
 package andrea.scala.functional.programming.testgeneration
 
+import andrea.scala.functional.programming.state.StateAction.{nextNonNegativeIntLessThan, sequence}
+
 /**
   * Created by andrea on 10/13/16.
   */
@@ -13,13 +15,23 @@ trait GenExamples[+T] {
 
 }
 
+case class GenNExamples[+T](n: Int, seed: Long) extends GenExamples[T] {
+
+  def forall(p : T => Boolean): Prop = ???
+
+}
+
 object GenExamples {
 
   /**
     * Generates examples of T (with an ordering ord) in the interval [lowerbound, upperbound]
     */
-  def chooseInInterval[T](lowerBound: T, upperBound: T)
-                         (implicit ord: Ordering[T]): GenExamples[T] = ???
+  def chooseInInterval[T](lb: T, ub: T)
+                         (implicit seed: Long, ord: Ordering[T])
+  : GenExamples[T] = ???
+
+  def chooseInInterval(lb: Int, ub: Int): GenExamples[Int] =
+    GenNExamples(nextNonNegativeIntLessThan(ub - lb).map(_ + lb)
 
   /**
     * Given a way to generate examples of type T, it generates examples of List[T]
@@ -42,34 +54,58 @@ trait Prop {
     */
   def check: Either[(FailedCase, SuccessCount), SuccessCount]
 
+  /**
+    * Constructs a proposition that succeed when both this and other
+    * succeed and fails otherwise
+    */
   def &&(other: => Prop): Prop = new Prop {
-    def check = ???
-  }
 
+    def check = (this.check, other.check) match {
+      case (Right(c1), Right(c2)) => Right(c1 + c2)
+      case (Left(_), _ ) => this.check
+      case (_, Left(_)) => other.check
+    }
 
-  /**
-    * True if the property holds for all examples, false if it
-    * can be falsified by at least one of them
-    */
-  def checkOld: Boolean
-
-  /**
-    * Combines two Props in a Prop that checks true if both props check true
-    * Exercise 8.3
-    */
-  def oldAndAnd(other: => Prop): Prop = new Prop {
-    def checkOld = this.checkOld && other.checkOld
   }
 
   /**
-    * Combines two Props in a Prop that checks true if at least one of the props check true
+    * Constructs a proposition that succeed when either this and other
+    * succeed and fails if both fail
     */
   def ||(other: => Prop): Prop = new Prop {
-    def checkOld = this.checkOld || other.checkOld
+
+    def check = (this.check, other.check) match {
+      case (Left((f1, c1)), Left((f2, c2))) => Left((s"$f1 ande $f2", c1 + c2))
+      case (Right(_), _ ) => this.check
+      case (_, Right(_)) => other.check
+    }
+
   }
 }
 
 object Prop {
+
   type SuccessCount = Int
+
   type FailedCase = String
+
+
+  /***************** OLD METHODS
+    *
+    */
+  trait PropOld {
+    /**
+      * True if the property holds for all examples, false if it
+      * can be falsified by at least one of them
+      */
+    def check: Boolean
+
+    /**
+      * Combines two Props in a Prop that checks true if both props check true
+      * Exercise 8.3
+      */
+    def && (other: => PropOld): PropOld = new PropOld {
+      def check = this.check && other.check
+    }
+  }
 }
