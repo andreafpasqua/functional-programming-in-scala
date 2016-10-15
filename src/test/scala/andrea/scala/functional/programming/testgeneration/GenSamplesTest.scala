@@ -31,8 +31,9 @@ object GenSamplesTest extends App {
     * Exercise 8.2
     */
 
-  implicit val numSamples = 100
+  implicit val numSamples = 1000
   implicit val state = SimpleRandomState(0L)
+  implicit val alphabet = "abcd".toVector
   val one = GenSamples.unit(1)
 
   println("Test unit")
@@ -45,42 +46,45 @@ object GenSamplesTest extends App {
   assert(two.forall(_ == 2).check == Right(numSamples))
   assert(eleven.forall(_ == "11").check == Right(numSamples))
 
-  println("Test chooseInInterval")
-  val zeroToThree = GenSamples.chooseInInterval(0, 4)
-  assert(zeroToThree.forall(_ < 4).check == Right(numSamples))
+  println("Test intInInterval")
+  val zeroToThree = GenSamples.intInInterval(0, 4)
+  assert(zeroToThree.forall(_ < 3).check == Right(numSamples))
   assert(zeroToThree.forall(_ < 0).check == Left("0", 0))
-  assert(zeroToThree.forall(_ < 2).check == Left("2", 64))
 
   println("Test boolean")
   val booleans = GenSamples.boolean
-  assert(booleans.forall(identity).check == Left(false.toString, 54))
+//  assert(booleans.forall(identity).check == Left(false.toString, 54))
 
   println("Test listOfN")
-  val lists = GenSamples.listOfN(GenSamples.chooseInInterval(0, 4), 10)
+  val lists = GenSamples.listOfN(GenSamples.intInInterval(0, 4), 10)
   assert(lists.forall(_.length == 10).check == Right(numSamples))
   assert(lists.forall(_.forall(_ < 4)).check == Right(numSamples))
-  assert(lists.forall(_.forall(_ < 2)).check ==
-    Left(List(0, 2, 1, 1, 2, 1, 1, 1, 1, 0).toString, 3))
+//  assert(lists.forall(_.forall(_ < 2)).check ==
+//    Left(List(0, 2, 1, 1, 2, 1, 1, 1, 1, 0).toString, 3))
 
-  println("Test &&")
-  assert((zeroToThree.forall(_ < 4) && zeroToThree.forall(_ >= 0)).check == Right(2 * numSamples))
-  assert((zeroToThree.forall(_ < 0) && zeroToThree.forall(_ >= 0)).check == Left("0", 0))
-  assert((zeroToThree.forall(_ < 4) && zeroToThree.forall(_ < 0)).check == Left("2", 0))
+  println("Test intPairInInterval")
+  val pairs = GenSamples.intPairInInterval(0, 2)
+  assert(pairs.forall(x => x._1 >= 0 && x._1 < 2).check == Right(numSamples))
+  assert(pairs.forall(x => x._2 >= 0 && x._2 < 2).check == Right(numSamples))
 
-  println("Test ||")
+  println("Test string")
+  val strings = GenSamples.string(10)
+  assert(strings.forall(_.length == 10).check == Right(numSamples))
+  assert(strings.forall(_.forall(alphabet.contains)).check == Right(numSamples))
+
+  println("Test flatMap")
+  assert(one.flatMap(GenSamples.string).forall(_ => true).check == Right(numSamples))
+  assert(GenSamples.intInInterval(0, 4).flatMap(GenSamples.string)
+      .forall(_.length < 4).check == Right(numSamples))
+  println(GenSamples.intInInterval(0, 4)
+    .forall(_ < 3).check)
 
 
-
-
-  def pivot(vec: Vector[Int]): Int = {
-    val totals = vec.scanLeft(0)(_ + _)
-    val total = totals.last
-    (for {
-      i <- vec.indices
-      partial = totals(i)
-      candidate = vec(i)
-      if partial * 2 == total - candidate
-    } yield i).headOption.getOrElse(-1)
-  }
+  //  println("Test &&")
+//  assert((zeroToThree.forall(_ < 4) && zeroToThree.forall(_ >= 0)).check == Right(2 * numSamples))
+//  assert((zeroToThree.forall(_ < 0) && zeroToThree.forall(_ >= 0)).check == Left("0", 0))
+//  assert((zeroToThree.forall(_ < 4) && zeroToThree.forall(_ < 0)).check == Left("2", 0))
+//
+//  println("Test ||")
 
 }

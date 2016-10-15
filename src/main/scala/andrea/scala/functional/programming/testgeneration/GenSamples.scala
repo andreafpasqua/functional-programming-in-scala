@@ -32,6 +32,16 @@ case class GenSamples[+T](sample: RandAction[T])(implicit numSamples: Int) {
     */
   def map[S](f: T => S): GenSamples[S] = GenSamples(sample.map(f))
 
+
+  /**
+    * given a function f that generates samples of s for a given t,
+    * it turns sampled ts into sampled ss. Notice that the number of
+    * sampled points doesn't change.
+    * Exercise 8.6
+    */
+  def flatMap[S](f: T => GenSamples[S]): GenSamples[S] =
+    GenSamples(sample.flatMap(t => f(t).sample))
+
 }
 
 object GenSamples {
@@ -39,16 +49,16 @@ object GenSamples {
   /**
     * Generates examples of T (with an ordering ord) in the interval [lb, ub)
     */
-  def chooseInInterval[T](lb: T, ub: T)
-                         (implicit numSamples: Int, ord: Ordering[T])
+  def intInInterval[T](lb: T, ub: T)
+                      (implicit numSamples: Int, ord: Ordering[T])
   : GenSamples[T] = ???
 
   /**
     * Specialized chooseInInterval to integers. Requires a numSamples
     * Exercise 8.4
     */
-  def chooseInInterval(lb: Int, ub: Int)
-                      (implicit numSamples: Int): GenSamples[Int] =
+  def intInInterval(lb: Int, ub: Int)
+                   (implicit numSamples: Int): GenSamples[Int] =
     GenSamples(nextNonNegativeIntLessThan(ub - 1 - lb)).map(_ + lb)
 
   /**
@@ -71,8 +81,27 @@ object GenSamples {
     * Exercise 8.5
     */
   def listOfN[T](sample: GenSamples[T], n: Int)
-                (implicit numSamples: Int): GenSamples[List[T]]
-  = GenSamples(sequence(List.fill(n)(sample.sample)))
+                (implicit numSamples: Int): GenSamples[List[T]] =
+    GenSamples(sequence(List.fill(n)(sample.sample)))
+
+  /**
+    * Generates pairs of integers each in the interval [lb, ub)
+    */
+  def intPairInInterval(lb: Int, ub: Int)
+                       (implicit numSamples: Int): GenSamples[(Int, Int)] = {
+    listOfN[Int](intInInterval(lb, ub)(numSamples), 2).
+      map(x => (x.head, x(1)))
+  }
+
+  /**
+    * Generates a random string of length length made with the characters
+    * in alphabet
+    */
+  def string(length: Int)
+            (implicit alphabet: IndexedSeq[Char],
+             numSamples: Int): GenSamples[String] =
+    listOfN(intInInterval(0, alphabet.length -1), length)(numSamples)
+      .map(_.map(alphabet).mkString)
 
 }
 
@@ -95,23 +124,23 @@ case class Prop(checkResult: RandAction[Prop.CheckResult]) {
     * Constructs a proposition that succeed when both this and other
     * succeed and fails otherwise
     */
-  def &&(other: => Prop): Prop = {
-
-    val newRandAction: Prop.CheckResult = (state: RandState) => {
-      val thisResult = checkResult.run(state)
-      thisResult match {
-        case (Left(x), _) => thisResult
-        case (thisRight(c), newState) => {
-          val otherResult = other.checkResult.run(newState)}
-          otherResult match {
-            case (Left(y) =>
-          }
-      }
-    }
-      checkResult.run(state) match {
-        case (Left(x), newState) => Left(x)
-        case Right(c) => other.checkResult.run(state)
-      }
+//  def &&(other: => Prop): Prop = {
+//???
+//    val newRandAction: Prop.CheckResult = (state: RandState) => {
+//      val thisResult = checkResult.run(state)
+//      thisResult match {
+//        case (Left(x), _) => thisResult
+//        case (thisRight(c), newState) => {
+//          val otherResult = other.checkResult.run(newState)}
+//          otherResult match {
+//            case (Left(y) =>
+//          }
+//      }
+//    }
+//      checkResult.run(state) match {
+//        case (Left(x), newState) => Left(x)
+//        case Right(c) => other.checkResult.run(state)
+//      }
 
 
     //        checkResult.map2(other.checkResult) {
@@ -120,8 +149,8 @@ case class Prop(checkResult: RandAction[Prop.CheckResult]) {
     //        case (_, Left(x)) => Left(x)
     //      }
     //    }
-    Prop(newRandAction)
-  }
+//    Prop(newRandAction)
+//  }
 
   /**
     * Constructs a proposition that succeed when either this and other
