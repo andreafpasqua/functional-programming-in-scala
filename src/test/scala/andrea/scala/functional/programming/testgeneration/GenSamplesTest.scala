@@ -69,4 +69,18 @@ object GenSamplesTest extends App {
 
   println("Test ||")
 
+
+
+
+  def pivot(vec: Vector[Int]): Int = {
+    val totals = vec.scanLeft(0)(_ + _)
+    val total = totals.last
+    (for {
+      i <- vec.indices
+      partial = totals(i)
+      candidate = vec(i)
+      if partial * 2 == total - candidate
+    } yield i).headOption.getOrElse(-1)
+  }
+
 }

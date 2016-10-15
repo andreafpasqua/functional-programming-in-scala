@@ -95,13 +95,33 @@ case class Prop(checkResult: RandAction[Prop.CheckResult]) {
     * Constructs a proposition that succeed when both this and other
     * succeed and fails otherwise
     */
-  def &&(other: => Prop): Prop = Prop(
-    checkResult.map2(other.checkResult) {
-      case (Right(c1), Right(c2)) => Right(c1 + c2)
-      case (Left(x), _ ) => Left(x)
-      case (_, Left(x)) => Left(x)
+  def &&(other: => Prop): Prop = {
+
+    val newRandAction: Prop.CheckResult = (state: RandState) => {
+      val thisResult = checkResult.run(state)
+      thisResult match {
+        case (Left(x), _) => thisResult
+        case (thisRight(c), newState) => {
+          val otherResult = other.checkResult.run(newState)}
+          otherResult match {
+            case (Left(y) =>
+          }
+      }
     }
-  )
+      checkResult.run(state) match {
+        case (Left(x), newState) => Left(x)
+        case Right(c) => other.checkResult.run(state)
+      }
+
+
+    //        checkResult.map2(other.checkResult) {
+    //        case (Right(c1), Right(c2)) => Right(c1 + c2)
+    //        case (Left(x), _ ) => Left(x)
+    //        case (_, Left(x)) => Left(x)
+    //      }
+    //    }
+    Prop(newRandAction)
+  }
 
   /**
     * Constructs a proposition that succeed when either this and other
