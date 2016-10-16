@@ -1,10 +1,10 @@
-package andrea.scala.functional.programming.testgeneration
+package andrea.scala.functional.programming.testing
 
 /**
   * Created by andreapasqua on 10/15/2016.
   */
 
-case class UnSizedSampler[+T](forSize: Int => Sampler[T]){
+case class BySizeSampler[+T](forSize: Int => Sampler[T]){
 
   /**
     * Given an unsized sampler, it constructs a proposition
@@ -31,7 +31,7 @@ case class UnSizedSampler[+T](forSize: Int => Sampler[T]){
     * Maps samples generated to new values using f for the mapping.
     * Exercise 8.11
     */
-  def map[S](f: T => S): UnSizedSampler[S] = UnSizedSampler(n => forSize(n).map(f))
+  def map[S](f: T => S): BySizeSampler[S] = BySizeSampler(n => forSize(n).map(f))
 
   /**
     * given a function f that generates samples of s for a given t,
@@ -39,14 +39,14 @@ case class UnSizedSampler[+T](forSize: Int => Sampler[T]){
     * sampled points doesn't change.
     * Exercise 8.11
     */
-  def flatMap[S](f: T => UnSizedSampler[S]): UnSizedSampler[S] =
-    UnSizedSampler(n => forSize(n).flatMap(t => f(t).forSize(n)))
+  def flatMap[S](f: T => BySizeSampler[S]): BySizeSampler[S] =
+    BySizeSampler(n => forSize(n).flatMap(t => f(t).forSize(n)))
 
   /**
     * given a sampler of integers it constructs lists of length equal to the integers sampled
     * Exercise 8.12
     */
-  def listOf(size: UnSizedSampler[Int]): UnSizedSampler[List[T]] = UnSizedSampler(
+  def listOf(size: BySizeSampler[Int]): BySizeSampler[List[T]] = BySizeSampler(
     n => forSize(n).listOf(size.forSize(n))
   )
 
@@ -54,7 +54,7 @@ case class UnSizedSampler[+T](forSize: Int => Sampler[T]){
     * It samples randomly from this or from other
     * Exercise 8.11
     */
-  def union[TT >: T](other: UnSizedSampler[TT]): UnSizedSampler[TT] = UnSizedSampler(
+  def union[TT >: T](other: BySizeSampler[TT]): BySizeSampler[TT] = BySizeSampler(
     n => forSize(n).union(other.forSize(n))
   )
 
@@ -63,8 +63,8 @@ case class UnSizedSampler[+T](forSize: Int => Sampler[T]){
     * thisWeight and otherWeight are nonnegative
     * Exercise 8.11
     */
-  def weighted[TT >: T](other: UnSizedSampler[TT], thisWeight: Double, otherWeight: Double)
-  : UnSizedSampler[TT] = UnSizedSampler(
+  def weighted[TT >: T](other: BySizeSampler[TT], thisWeight: Double, otherWeight: Double)
+  : BySizeSampler[TT] = BySizeSampler(
     n => forSize(n).weighted(other.forSize(n), thisWeight, otherWeight)
   )
 

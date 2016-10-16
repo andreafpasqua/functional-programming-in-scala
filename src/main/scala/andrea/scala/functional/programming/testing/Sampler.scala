@@ -1,8 +1,9 @@
-package andrea.scala.functional.programming.testgeneration
+package andrea.scala.functional.programming.testing
 
 import andrea.scala.functional.programming.state.{RandState, StateAction}
 import andrea.scala.functional.programming.state.StateAction.{RandAction, nextNonNegativeIntLessThan, sequence}
 import andrea.scala.functional.programming.stream.Stream.{from, unfold}
+import andrea.scala.functional.programming.stream.Stream
 /**
   * Created by andrea on 10/13/16.
   */
@@ -20,22 +21,10 @@ case class Sampler[+T](sample: RandAction[T]) {
   def forall(p: T => Boolean): Prop = Prop(
     (_, sampleSize, state) => {
       val samplesStreamed = unfold(state)(s => Some(sample.run(s)))
-      val finiteSample = samplesStreamed.zip(from(0)).take(sampleSize)
-      val outcomes = finiteSample.map {
-        case (t, count) => try {
-          if (p(t)) Prop.Passed else Prop.Falsified(t.toString, count)
-        }
-        catch {
-          case e: Exception => Prop.Falsified(buildMessageFromException(e, t), count)
-        }
-      }
-      outcomes.find(_.isFalsified).getOrElse(Prop.Passed)
+      val finiteSample = samplesStreamed.take(sampleSize)
+      Sampler.checkSample(finiteSample, p)
     }
   )
-
-  private def buildMessageFromException[TT >: T](e: Exception, t: TT): String =
-    s"test case $t\ngenerated an exception ${e.getMessage}\nwith stack trace:\n" +
-      s"${e.getStackTrace.mkString}\n"
 
   /**
     * Maps samples generated to new values using f for the mapping
@@ -81,7 +70,7 @@ case class Sampler[+T](sample: RandAction[T]) {
     * simply ignores the size input.
     * Exercise 8.10
     */
-  def unSized: UnSizedSampler[T] = UnSizedSampler(_ => this)
+  def unSized: BySizeSampler[T] = BySizeSampler(_ => this)
 
   /************** OLD ROUTINES
     */
@@ -152,6 +141,26 @@ object Sampler {
     intInInterval(0, alphabet.length - 1)
       .listOf(intInInterval(0, maxLength + 1))
       .map(_.map(alphabet).mkString)
+
+  /**
+    * Given a sample (exhaustive or not) it checks if the predicate p applies to
+    * all examples and returns a CheckResult, as either Falsified or Passed.
+    */
+  def checkSample[T](samples: Stream[T], p: T => Boolean): Prop.CheckResult = {
+    val outcomes = samples.zip(from(0)).map {
+      case (t, count) => try {
+        if (p(t)) Prop.Passed else Prop.Falsified(t.toString, count)
+      }
+      catch {
+        case e: Exception => Prop.Falsified(buildMessageFromException(e, t), count)
+      }
+    }
+    outcomes.find(_.isFalsified).getOrElse(Prop.Passed)
+  }
+
+  private def buildMessageFromException[T](e: Exception, t: T): String =
+    s"test case $t\ngenerated an exception ${e.getMessage}\nwith stack trace:\n" +
+      s"${e.getStackTrace.mkString}\n"
 
   /*********************** OLD ROUTINES
     *

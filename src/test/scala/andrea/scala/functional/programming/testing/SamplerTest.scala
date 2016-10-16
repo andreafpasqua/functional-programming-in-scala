@@ -1,4 +1,4 @@
-package andrea.scala.functional.programming.testgeneration
+package andrea.scala.functional.programming.testing
 
 import andrea.scala.functional.programming.state.SimpleRandomState
 
@@ -66,7 +66,7 @@ object SamplerTest extends App {
 
   println("Test intPairInInterval")
   val pairs = Sampler.intPairInInterval(0, 2)
-  assert(pairs.forall(x => x._1 >= 0 && x._1 < 2).check(maxSize, numSamples, state).passed)
+ assert(pairs.forall(x => x._1 >= 0 && x._1 < 2).check(maxSize, numSamples, state).passed)
   assert(pairs.forall(x => x._2 >= 0 && x._2 < 2).check(maxSize, numSamples, state).passed)
 
   println("Test string")
@@ -115,7 +115,7 @@ object SamplerTest extends App {
   assert((zeroToThree.forall(_ >= 4) || zeroToThree.forall(_ < 0)).check(maxSize, numSamples, state).isFalsified)
 
   println("Test forall for UnSizedSampler")
-  val variousLengths = UnSizedSampler(n => Sampler.double.listOf(Sampler.unit(n)))
+  val variousLengths = BySizeSampler(n => Sampler.double.listOf(Sampler.unit(n)))
   def maxPredicate1(list: List[Double]) = if (list.isEmpty) true else {
     val max = list.max
     list.forall(_ <= max)
@@ -132,7 +132,7 @@ object SamplerTest extends App {
   /**
     * Exercise 8.13
     */
-  val nonEmptyLists = UnSizedSampler(n => Sampler.double.listOf(Sampler.unit(n.max(1))))
+  val nonEmptyLists = BySizeSampler(n => Sampler.double.listOf(Sampler.unit(n.max(1))))
   assert(nonEmptyLists.forall(maxPredicate2).check(10, 10 * numSamples, state).passed)
 
   /**
@@ -148,5 +148,13 @@ object SamplerTest extends App {
   assert((nonEmptyLists.forall(sortPredicate2) &&
     nonEmptyLists.forall(sortPredicate3)
     && nonEmptyLists.forall(sortPredicate4)).check(10, 10 * numSamples, state).passed)
+
+  println("Test prove")
+  def tautology = 3 + 2 == 5
+  def contradiction = 3 + 2 == 4
+  assert(Prop.prove(tautology).check().passed)
+  assert(Prop.prove(contradiction).check().isFalsified)
+  assert((Prop.prove(tautology) || Prop.prove(contradiction)).check().passed)
+  assert((Prop.prove(tautology) &&  one.forall(_ == 1)).check().passed)
 
 }

@@ -1,4 +1,4 @@
-package andrea.scala.functional.programming.testgeneration
+package andrea.scala.functional.programming.testing
 
 import andrea.scala.functional.programming.state.{RandState, SimpleRandomState}
 
@@ -22,6 +22,7 @@ case class Prop(run: (Prop.MaxTestSize, Prop.SampleSize, RandState) => Prop.Chec
     result match {
       case Prop.Falsified(msg, n) => println(s"Falsified after $n samples with message $msg")
       case Prop.Passed => println(s"Passed after $numSamples tests")
+      case Prop.Proved => println("Proved")
     }
     result
   }
@@ -70,7 +71,7 @@ object Prop {
 
   type FailedCase = String
 
-  trait CheckResult {
+  sealed trait CheckResult {
     def isFalsified: Boolean
     val passed: Boolean = !isFalsified
   }
@@ -79,9 +80,21 @@ object Prop {
     val isFalsified: Boolean = false
   }
 
+  case object Proved extends CheckResult {
+    val isFalsified: Boolean = false
+  }
+
   case class Falsified(failure: FailedCase, successes: SuccessCount) extends CheckResult {
     val isFalsified: Boolean = true
   }
+
+  /**
+    * It creates a proposition which is proved if the predicate p
+    * holds and falsified otherwise
+    */
+  def prove(p: => Boolean): Prop = Prop(
+    (_, _, _) => if (p) Proved else Falsified("()", 0)
+  )
 
   /***************** OLD METHODS
     *
