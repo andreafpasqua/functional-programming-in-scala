@@ -361,8 +361,6 @@ object Stream {
     * Generates a stream by starting with a state s, applying to it
     * a function f that generates a value and a new state and iterate
     * the process. If the function returns None, then the stream terminates
-    *
-    * @return
     */
   def unfold[T, S](s: S)(f: S => Option[(T, S)]): Stream[T] =
     f(s).map {

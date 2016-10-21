@@ -14,9 +14,23 @@ sealed trait List[+A] {
   def ::[B >: A](b: B) = Cons(b, this)
 
   /**
-    * An equality method for lists. Should be tail-recursive
+    * Converts a list into a Vector
     */
-  def ==[AA >: A](other: List[AA]): Boolean = this.fold2Right
+  def toSeq: Vector[A] = foldLeft(Vector[A]())((vec, a) => vec :+ a)
+
+  /**
+    * An equality method for lists. Should be tail-recursive.
+    * Notice that overriding the equals method is tricky because it
+    * is used in pattern matching so you will encounter infinite loops
+    * if the equals uses pattern matching itself. The solution was to
+    * define an isEmpty method to decide equality of Nil and make sure
+    * that isEmpty is defined at the level of Nil and Cons, not at the
+    * level of List
+    */
+  override def equals(other: Any): Boolean = other match {
+    case l: List[_] => toSeq == l.toSeq
+    case _ => false
+  }
 
   /**
     * sums the elements of the list using the implicit zeros and plus methods of Numeric[B]
@@ -39,20 +53,16 @@ sealed trait List[+A] {
     * for large lists
     * Exercise 3.12
     */
-  def reverse: List[A] = foldLeft(
-    List[A]()
-  )(
-    (list: List[A], a: A) => Cons(a, list)
-  )
+  def reverse: List[A] = foldLeft(Nil: List[A])((list, a: A) => Cons(a, list))
 
   /**
     * Returns true if the list is Nil, else returns false
     */
-  def isEmpty: Boolean = this match {
-    case Nil => true
-    case Cons(_, _) => false
-  }
+  def isEmpty: Boolean
 
+  /**
+    * Returns the head of a list. Throws an exception if the list is empty
+    */
   def head: A = this match {
     case Nil => throw new NoSuchMethodException("Tail called on an empty list")
     case Cons(head, tail) => head
@@ -91,21 +101,20 @@ sealed trait List[+A] {
   /**
     * Returns the list with the first n elements of the original list, or the same
     * list if it has length less than n.
-    * A non tail recursive implementation. It fails when both the list and n are large
     */
-  def take(n: Int): List[A] =
-    if ((n == 0) || isEmpty) Nil
-    else Cons(head, tail.take(n - 1))
+  def take(n: Int): List[A] = foldLeft((Nil: List[A], n)) {
+    case ((soFar, i), a)  if i > 0 => (Cons(a, soFar), i - 1)
+    case ((soFar, i), _) => (soFar, 0)
+  }._1.reverse
 
   /**
     * Returns all the elements of the first list up until the first that fails the predicate
     * p.
-    * A non tail recursive implementation. It fails when the list is large and the predicate is
-    * true for a while
     */
-  def takeWhile(p: A => Boolean): List[A] =
-    if (isEmpty || !p(head)) Nil
-    else Cons(head, tail.takeWhile(p))
+  def takeWhile(p: A => Boolean): List[A] = foldLeft((Nil: List[A], true)) {
+    case ((soFar, true), a)  if p(a) => (Cons(a, soFar), true)
+    case ((soFar, _), _) => (soFar, false)
+  }._1.reverse
 
   /**
     * Returns true if all the elements of the list satisfy the predicate,
@@ -130,29 +139,22 @@ sealed trait List[+A] {
   /**
     * Returns a list of partial results for the foldLeft with the same zero z and the same
     * function f. Note that the list starts with z.
-    *
-    * @return
     */
-  def scanLeft[B](z: B)(f: (B, A) => B): List[B] =
-    foldLeft((List(z), z)) {
-      case ((l, last), a) => {
-        val curr = f(last, a)
-        (l.append(List(curr)), curr)
-      }
-    }._1
+  def scanLeft[B](z: B)(f: (B, A) => B): List[B] = foldLeft((List(z), z)) {
+    case ((l, last), a) =>
+      val curr = f(last, a)
+      (Cons(curr, l), curr)
+  }._1.reverse
 
   /**
     * Returns a list of partial results for the foldRight with the same zero z and the same
     * function f. Note that the list starts with z.
-    *
-    * @return
     */
   def scanRight[B](z: B)(f: (A, B) => B): List[B] =
     foldRight((List(z), z)) {
-      case (a, (l, last)) => {
+      case (a, (l, last)) =>
         val curr = f(a, last)
         (Cons(curr, l), curr)
-      }
     }._1
         /**
     * returns a new list with the head replaced by the argument a.
@@ -165,27 +167,15 @@ sealed trait List[+A] {
 
   /**
     * Returns a list consisting of the current list followed by other.
-    * For large lists this gives a stack overflow error
     * Exercise 3.14
     */
-  def append[B >: A](other: List[B]): List[B] = this.foldRight(other)(Cons(_, _))
+  def append[B >: A](other: List[B]): List[B] = foldRight(other)(Cons(_, _))
 
   /**
     * Drops the last element of a list. If the list is empty, it remains empty
-    * Implemented using ListBuffers. It gives a stack overflow error on large lists.
     */
-  def init: List[A] = {
-    val buf = new ListBuffer[A]
-    @tailrec
-    def go(l: List[A]): List[A] = l match {
-      case Nil => Nil
-      case Cons(_, Nil) => List(buf.toList: _*)
-      case Cons(h, t) =>
-        buf += h
-        go(t)
-    }
-    go(this)
-  }
+  def init: List[A] = reverse.drop(1).reverse
+
   /**
     * Implements a tail recursive foldLeft, which given a List(a_1, ... , a_n) returns
     * f(f(...f(f(z, a_1), a_2), ..., a_n))
@@ -208,7 +198,6 @@ sealed trait List[+A] {
     * @param f the folding function
     */
   def foldRight[B](z: B)(f: (A, B) => B): B = reverse.foldLeft(z)((b, a) => f(a, b))
-
 
   /**
     * Returns a list where the elements of the old list are transformed by applying the function f.
@@ -241,11 +230,18 @@ sealed trait List[+A] {
     * given two lists and a function that takes an element in the first list and an element
     * in the second list, it constructs a list with the transformed elements. If the two
     * lists have different dimensions the zipping ends when either one of the two lists is
-    * exhausted.
+    * exhausted. Note that this is not tail-recursive.
     * Exercise 3.22, 3.23
     */
-  def zipWith[B, C](other: List[B])(f: (A, B) => C): List[C] =
-    fold2Right(other)(Nil: List[C])((a, b, c) => Cons(f(a, b), c))
+  def zipWith1[B, C](other: List[B])(f: (A, B) => C): List[C] = (this, other) match {
+    case (Nil, _) | (_, Nil) => Nil: List[C]
+    case (Cons(h1, t1), Cons(h2, t2)) => Cons(f(h1, h2), t1.zipWith(t2)(f))
+  }
+
+  def zipWith[B, C](other: List[B])(f: (A, B) => C): List[C] = foldLeft((List[C](), other)) {
+    case ((soFar, Nil), _) => (soFar, Nil)
+    case ((soFar, Cons(h, t)), a) => (Cons(f(a, h), soFar), t)
+  }._1.reverse
 
   /**
     * Given two lists constructs a list for which the elements are tuples of corresponding
@@ -253,23 +249,6 @@ sealed trait List[+A] {
     * when either one of the two lists is exhausted.
     */
   def zip[B](other: List[B]): List[(A, B)] = zipWith(other)((a, b) => (a, b))
-
-  /**
-    * A tail-recursive version of foldLeft that works with two lists instead of one
-    */
-  @tailrec
-  private def fold2Left[B, C](other: List[B])(z: C)(f: (C, A, B) => C): C =
-    (this, other) match {
-      case (Nil, _) | (_, Nil) => z
-      case (Cons(h1, t1), Cons(h2, t2)) => t1.fold2Left(t2)(f(z, h1, h2))(f)
-    }
-
-  /**
-    * A tail-recursive version of foldRight that works with two lists instead of one
-    */
-  private def fold2Right[B, C](other: List[B])(z: C)(f: (A, B, C) => C): C =
-    reverse.fold2Left(other.reverse)(z)((c, a, b) => f(a, b, c))
-
 
   /**
     * Returns true if the list contains subList as a sublist. False otherwise.
@@ -292,6 +271,44 @@ sealed trait List[+A] {
   /**************** OLDER VERSIONS OF ROUTINES
     *
     */
+
+  /**
+    * Returns the list with the first n elements of the original list, or the same
+    * list if it has length less than n.
+    * A non tail recursive implementation. It fails when both the list and n are large
+    */
+  def takeNoTailRec(n: Int): List[A] =
+    if ((n == 0) || isEmpty) Nil
+    else Cons(head, tail.takeNoTailRec(n - 1))
+
+
+  /**
+    * Returns all the elements of the first list up until the first that fails the predicate
+    * p.
+    * A non tail recursive implementation. It fails when the list is large and the predicate is
+    * true for a while
+    */
+  def takeWhileNoTailRec(p: A => Boolean): List[A] =
+    if (isEmpty || !p(head)) Nil
+    else Cons(head, tail.takeWhileNoTailRec(p))
+
+  /**
+    * Drops the last element of a list. If the list is empty, it remains empty
+    * Implemented using ListBuffers. It gives a stack overflow error on large lists.
+    */
+  def initListBuffer: List[A] = {
+    val buf = new ListBuffer[A]
+    @tailrec
+    def go(l: List[A]): List[A] = l match {
+      case Nil => Nil
+      case Cons(_, Nil) => List(buf.toList: _*)
+      case Cons(h, t) =>
+        buf += h
+        go(t)
+    }
+    go(this)
+  }
+
   def sumNoFold[B >: A](implicit num: Numeric[B]): B =
     this match {
       case Nil => num.zero
@@ -371,9 +388,18 @@ sealed trait List[+A] {
   }
 }
 
-case object Nil extends List[Nothing]
+case object Nil extends List[Nothing] {
+  override val isEmpty: Boolean = true
+  override def equals(other: Any): Boolean = other match {
+    case l: List[_] => l.isEmpty
+    case _ => false
+  }
+}
 
-case class Cons[+A](h: A, t: List[A]) extends List[A]
+case class Cons[+A](h: A, t: List[A]) extends List[A] {
+  val isEmpty: Boolean = false
+
+}
 
 object List {
 
