@@ -14,6 +14,7 @@ object ListTest extends App {
   val listManyOne = fill(100000)(1)
 
   println("Test sum")
+  println(listEmpty.sum)
   assert(listEmpty.sum == 0)
   assert(listOne.sum == 1)
   assert(listMultiple.sum == 15)

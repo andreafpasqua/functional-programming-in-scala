@@ -84,9 +84,19 @@ sealed trait Stream[+T] {
     * only as needed.
     * Exercise 5.7
     */
-  def flatMap[S](f: T => Stream[S]) = foldRight(Stream.empty[S])(
+  def flatMap[S](f: T => Stream[S]): Stream[S] = foldRight(Stream.empty[S])(
     (t, ss) => f(t).append(ss)
   )
+
+  /**
+    * Maps all the elements of a stream using the function f (which itself
+    * returns an Option) and then flattens the options. It uses foldRight so it applies the function
+    * only as needed.
+    */
+//  def flatMap[S](f: T => Option[S]): Stream[S] = flatMap {
+//    (t: T) => f(t).map(s => Stream(s)).getOrElse(Stream.empty[S])
+//  }
+
 
   /**
     * Optionally returns the first element that satisfies the

@@ -14,6 +14,11 @@ sealed trait List[+A] {
   def ::[B >: A](b: B) = Cons(b, this)
 
   /**
+    * An equality method for lists. Should be tail-recursive
+    */
+  def ==[AA >: A](other: List[AA]): Boolean = this.fold2Right
+
+  /**
     * sums the elements of the list using the implicit zeros and plus methods of Numeric[B]
     */
   def sum[B >: A](implicit num: Numeric[B]): B = foldLeft(num.zero)(num.plus)
@@ -34,7 +39,11 @@ sealed trait List[+A] {
     * for large lists
     * Exercise 3.12
     */
-  def reverse: List[A] = foldLeft(List[A]())((list: List[A], a: A) => Cons(a, list))
+  def reverse: List[A] = foldLeft(
+    List[A]()
+  )(
+    (list: List[A], a: A) => Cons(a, list)
+  )
 
   /**
     * Returns true if the list is Nil, else returns false
@@ -121,6 +130,7 @@ sealed trait List[+A] {
   /**
     * Returns a list of partial results for the foldLeft with the same zero z and the same
     * function f. Note that the list starts with z.
+    *
     * @return
     */
   def scanLeft[B](z: B)(f: (B, A) => B): List[B] =
@@ -134,6 +144,7 @@ sealed trait List[+A] {
   /**
     * Returns a list of partial results for the foldRight with the same zero z and the same
     * function f. Note that the list starts with z.
+    *
     * @return
     */
   def scanRight[B](z: B)(f: (A, B) => B): List[B] =
@@ -190,25 +201,13 @@ sealed trait List[+A] {
   }
 
   /**
-    * Implements a tail recursive foldRight, which given a List(a_1, ... , a_n) returns
-    * f(a1, f(a2, ...(f(a_n-1, f(a_n, z)))...)).
-    * The idea behind the implementation is that f(a_1, f(a_2, ..., f(a_n-1, f(a_n, z)) ... )
-    * can be rewritten as op_1(op_2(...(op_n-1(op_n)...) (z)
-    * where op_i = f(a_i, z) is a transformation from a z to a new z
-    * But functions are associative under compositions, so you can
-    * also write them as (...((op_1.op_2).op_3),...op_n).Id, which is
-    * a foldLeft. Then apply the resulting function to z.
-    * Note that while this is tail-recursive, it still gives a stack overflow, probably
-    * because of the function composition.
-    * Exercise 3.13
+    * Implements a non tail recursive foldRight, which given a List(a_1, ... , a_n) returns
+    * f(a1, f(a2, ...(f(a_n-1, f(a_n, z)))...))
     *
     * @param z the zero element
     * @param f the folding function
     */
-  def foldRight[B](z: B)(f: (A, B) => B): B = {
-    val generator: (B) => B = this.foldLeft((b: B) => b)((g: (B) => B, a: A) => (b: B) => g(f(a, b)))
-    generator(z)
-  }
+  def foldRight[B](z: B)(f: (A, B) => B): B = reverse.foldLeft(z)((b, a) => f(a, b))
 
 
   /**
@@ -245,24 +244,32 @@ sealed trait List[+A] {
     * exhausted.
     * Exercise 3.22, 3.23
     */
-  def zipWith[B, C](other: List[B])(f: (A, B) => C): List[C] = {
+  def zipWith[B, C](other: List[B])(f: (A, B) => C): List[C] =
+    fold2Right(other)(Nil: List[C])((a, b, c) => Cons(f(a, b), c))
 
-    // a tail-recursive version of foldLeft that works with two lists instead of one
-    @tailrec
-    def fold2Left[BB, CC](l1: List[A], l2: List[BB])(z: CC)(f: (CC, A, BB) => CC): CC =
-      (l1, l2) match {
-        case (Nil, _) | (_, Nil) => z
-        case (Cons(h1, t1), Cons(h2, t2)) => fold2Left(t1, t2)(f(z, h1, h2))(f)
-      }
-    // a tail-recursive version of foldRight that works with two lists instead of one
-    def fold2Right[BB, CC](l1: List[A], l2: List[BB])(z: CC)(f: (A, BB, CC) => CC): CC = {
-      val generator: (CC) => CC = fold2Left(l1, l2)((c: CC) => c)(
-        (g: (CC) => CC, a: A, b: BB) => (c: CC) => g(f(a, b, c))
-      )
-      generator(z)
+  /**
+    * Given two lists constructs a list for which the elements are tuples of corresponding
+    * elements in the two lists. If the two lists have different dimensions the zipping ends
+    * when either one of the two lists is exhausted.
+    */
+  def zip[B](other: List[B]): List[(A, B)] = zipWith(other)((a, b) => (a, b))
+
+  /**
+    * A tail-recursive version of foldLeft that works with two lists instead of one
+    */
+  @tailrec
+  private def fold2Left[B, C](other: List[B])(z: C)(f: (C, A, B) => C): C =
+    (this, other) match {
+      case (Nil, _) | (_, Nil) => z
+      case (Cons(h1, t1), Cons(h2, t2)) => t1.fold2Left(t2)(f(z, h1, h2))(f)
     }
-    fold2Right(this, other)(Nil: List[C])((a, b, c) => Cons(f(a, b), c))
-  }
+
+  /**
+    * A tail-recursive version of foldRight that works with two lists instead of one
+    */
+  private def fold2Right[B, C](other: List[B])(z: C)(f: (A, B, C) => C): C =
+    reverse.fold2Left(other.reverse)(z)((c, a, b) => f(a, b, c))
+
 
   /**
     * Returns true if the list contains subList as a sublist. False otherwise.
@@ -321,6 +328,29 @@ sealed trait List[+A] {
   def foldRightNotTailRec[B](z: B)(f: (A, B) => B): B = this match {
     case Nil => z
     case Cons(h, t) => f(h, t.foldRightNotTailRec(z)(f))
+  }
+
+  /**
+    * Implements a tail recursive foldRight, which given a List(a_1, ... , a_n) returns
+    * f(a1, f(a2, ...(f(a_n-1, f(a_n, z)))...)).
+    * The idea behind the implementation is that f(a_1, f(a_2, ..., f(a_n-1, f(a_n, z)) ... )
+    * can be rewritten as op_1(op_2(...(op_n-1(op_n)...) (z)
+    * where op_i = f(a_i, z) is a transformation from a z to a new z
+    * But functions are associative under compositions, so you can
+    * also write them as (...((op_1.op_2).op_3),...op_n).Id, which is
+    * a foldLeft. Then apply the resulting function to z.
+    * Note that while this is tail-recursive, it still gives a stack overflow, probably
+    * because of the function composition.
+    * Exercise 3.13
+    * Note that this is also not tail recursive, because of the nested function composition
+    *
+    * @param z the zero element
+    * @param f the folding function
+    */
+  def foldRightViaFoldLeft[B](z: B)(f: (A, B) => B): B = {
+    this.reverse.foldLeft(z)((B, A) => f(A, B))
+    val generator: (B) => B = this.foldLeft((b: B) => b)((g: (B) => B, a: A) => (b: B) => g(f(a, b)))
+    generator(z)
   }
 
   /**
