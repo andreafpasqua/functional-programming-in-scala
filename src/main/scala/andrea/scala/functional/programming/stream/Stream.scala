@@ -28,12 +28,15 @@ sealed trait Stream[+T] {
   def tail: Stream[T]
 
   /**
-    * A method to turn a stream into a list
+    * A method to turn a stream into a list.
     * Exercise 5.1
     */
-  def toList: List[T] = this match {
-    case Cons(hd, tl) => hd() :: tl().toList
-    case Empty => Nil
+  def toList: List[T] = {
+    def go(stream: Stream[T], list: List[T]): List[T] = {
+      if (stream.isEmpty) list
+      else go(stream.tail, stream.head :: list)
+    }
+    go(this, List.empty[T]).reverse
   }
 
   /**

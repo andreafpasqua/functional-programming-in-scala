@@ -166,7 +166,6 @@ object StreamTest extends App {
   assert(streamThree.find(_ == 2).get == 2)
   assert(streamThree.find(_ > 3).isEmpty)
 
-
   println("Test constant")
   assert(Stream.constant("a").take(4).toList == List.fill(4)("a"))
 
