@@ -55,6 +55,11 @@ sealed trait Option[+A] {
   def map2[B, C](other: Option[B])(f: (A, B) => C): Option[C] =
     flatMap(a => other.map(b => f(a, b)))
 
+  /**
+    * true if the Option is None else false
+    */
+  def isEmpty: Boolean
+
 }
 
 object Option {
@@ -93,5 +98,9 @@ object Option {
 
 }
 
-case object None extends Option[Nothing]
-case class Some[A](get: A) extends Option[A]
+case object None extends Option[Nothing] {
+  def isEmpty: Boolean = true
+}
+case class Some[A](get: A) extends Option[A] {
+  def isEmpty: Boolean = false
+}

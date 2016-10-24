@@ -3,24 +3,23 @@ package andrea.scala.functional.programming.testing
 import andrea.scala.functional.programming.state.{RandState, SimpleRandomState}
 
 /**
-  * Contains all the information about a property that
-  * may or may not hold for an object and how to test
-  * it against a set of examples each of size TestSize
-  * and numbering SampleSize.
+  * Copyright 2016, Radius Intelligence, Inc.
+  * All Rights Reserved
+  * Created by andreapasqua on 10/22/2016.
   */
 case class Prop(run: (Prop.MaxTestSize, Prop.SampleSize, RandState) => Prop.CheckResult) {
-
   /**
     * A convenient method to call run with defaults for the max test size, the sample size and
     * the random state
     */
-  def check(maxTestSize: Prop.MaxTestSize = 100,
-            numSamples: Prop.SampleSize = 100,
-            state: RandState = SimpleRandomState(System.currentTimeMillis())
+  def check(
+             maxSize: Prop.MaxTestSize = 100,
+             numSamples: Prop.SampleSize = 100,
+             state: RandState = SimpleRandomState(System.currentTimeMillis())
            ): Prop.CheckResult = {
-    val result = run(maxTestSize, numSamples, state)
+    val result = run(maxSize, numSamples, state)
     result match {
-      case Prop.Falsified(msg, n) => println(s"Falsified after $n samples with message $msg")
+      case Prop.Falsified(msg, n) => println(s"Falsified after $n tests with message $msg")
       case Prop.Passed => println(s"Passed after $numSamples tests")
       case Prop.Proved => println("Proved")
     }
@@ -33,10 +32,10 @@ case class Prop(run: (Prop.MaxTestSize, Prop.SampleSize, RandState) => Prop.Chec
     * Exercise 8.9
     */
   def &&(other: => Prop): Prop = Prop(
-    (testSize, sampleSize, state) => {
-      val thisResult = run(testSize, sampleSize, state)
+    (maxTestSize, sampleSize, state) => {
+      val thisResult = run(maxTestSize, sampleSize, state)
       if (thisResult.isFalsified) thisResult
-      else other.run(testSize, sampleSize, state)
+      else other.run(maxTestSize, sampleSize, state)
     }
   )
 
@@ -46,10 +45,10 @@ case class Prop(run: (Prop.MaxTestSize, Prop.SampleSize, RandState) => Prop.Chec
     * Exercise 8.9
     */
   def ||(other: => Prop): Prop = Prop(
-    (testSize, sampleSize, state) => {
-      val thisResult = run(testSize, sampleSize, state)
-      if (thisResult.passed) thisResult
-      else other.run(testSize, sampleSize, state)
+    (maxSize, sampleSize, state) => {
+      val thisResult = run(maxSize, sampleSize, state)
+      if (thisResult.notFalsified) thisResult
+      else other.run(maxSize, sampleSize, state)
     }
   )
 
@@ -73,7 +72,7 @@ object Prop {
 
   sealed trait CheckResult {
     def isFalsified: Boolean
-    val passed: Boolean = !isFalsified
+    def notFalsified: Boolean = !isFalsified
   }
 
   case object Passed extends CheckResult {
@@ -96,22 +95,4 @@ object Prop {
     (_, _, _) => if (p) Proved else Falsified("()", 0)
   )
 
-  /***************** OLD METHODS
-    *
-    */
-  trait PropOld {
-    /**
-      * True if the property holds for all examples, false if it
-      * can be falsified by at least one of them
-      */
-    def check: Boolean
-
-    /**
-      * Combines two Props in a Prop that checks true if both props check true
-      * Exercise 8.3
-      */
-    def && (other: => PropOld): PropOld = new PropOld {
-      def check = this.check && other.check
-    }
-  }
 }

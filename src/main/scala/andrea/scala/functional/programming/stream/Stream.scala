@@ -92,16 +92,6 @@ sealed trait Stream[+T] {
   )
 
   /**
-    * Maps all the elements of a stream using the function f (which itself
-    * returns an Option) and then flattens the options. It uses foldRight so it applies the function
-    * only as needed.
-    */
-//  def flatMap[S](f: T => Option[S]): Stream[S] = flatMap {
-//    (t: T) => f(t).map(s => Stream(s)).getOrElse(Stream.empty[S])
-//  }
-
-
-  /**
     * Optionally returns the first element that satisfies the
     * predicate p or None
     */

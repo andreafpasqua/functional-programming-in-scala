@@ -1,7 +1,7 @@
 package andrea.scala.functional.programming.testing
 
 /**
-  * Created by andreapasqua on 10/15/2016.
+  * Created by andreapasqua on 10/17/2016.
   */
 
 case class BySizeSampler[+T](forSize: Int => Sampler[T]){
@@ -17,12 +17,12 @@ case class BySizeSampler[+T](forSize: Int => Sampler[T]){
     (maxSize, numSamples, state) => {
       val samplesPerSize = (numSamples + maxSize - 1) / maxSize // the total number of samples >= numSamples
       val allProps = for (
-        size <- (0 to 1 + maxSize.min(numSamples)).toList
-      ) yield {
-        forSize(size).forall(p)
-      }
+          size <- (0 to 1 + maxSize.min(numSamples)).toList
+        ) yield {
+          forSize(size).forall(p)
+        }
       allProps.reduce(_ && _).run(maxSize, samplesPerSize, state)
-      // note that check ignores maxSize here since the propositions
+      // note that run ignores maxSize here since the propositions
       // where constructed by regular Samplers.
     }
   )
@@ -40,7 +40,7 @@ case class BySizeSampler[+T](forSize: Int => Sampler[T]){
     * Exercise 8.11
     */
   def flatMap[S](f: T => BySizeSampler[S]): BySizeSampler[S] =
-    BySizeSampler(n => forSize(n).flatMap(t => f(t).forSize(n)))
+    BySizeSampler(n => forSize(n).flatMap(f(_).forSize(n)))
 
   /**
     * given a sampler of integers it constructs lists of length equal to the integers sampled
