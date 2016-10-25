@@ -25,9 +25,23 @@ sealed trait Either[+L, +R] {
     case Left(v) => fl(v)
     case Right(v) => fr(v)
   }
+
+  /**
+    * True if it's a Left
+    */
+  def isLeft: Boolean
+
+  /**
+    * True if it's a Right
+    */
+  def isRight: Boolean = !isLeft
 }
-case class Left[+L](value: L) extends Either[L, Nothing]
-case class Right[+R](value: R) extends Either[Nothing, R]
+case class Left[+L](value: L) extends Either[L, Nothing] {
+  def isLeft: Boolean = true
+}
+case class Right[+R](value: R) extends Either[Nothing, R] {
+  def isLeft: Boolean = false
+}
 
 object Either {
 
@@ -98,6 +112,14 @@ case class LeftProjection[+L, +R](either: Either[L, R]) {
   }
 
   /**
+    * Returns the left value if any. If there is a right value, then it throws an exception.
+    */
+  def get: L = this.either match {
+    case Right(_) => throw new NoSuchElementException("get called on an empty LeftProjection")
+    case Left(v) => v
+  }
+
+  /**
     * Returns this if there is a left value, else it returns the default.
     */
   def orElse[LL >: L, RR >: R](default: => Either[LL, RR]): Either[LL, RR] = this.either match {
@@ -150,6 +172,14 @@ case class RightProjection[+L, +R](either: Either[L, R]) {
     */
   def getOrElse[RR >: R](default: RR) = this.either match {
     case Left(_) => default
+    case Right(v) => v
+  }
+
+  /**
+    * Returns the right value if any. If there is a left value, then it throws an exception.
+    */
+  def get: R = this.either match {
+    case Left(_) => throw new NoSuchElementException("get called on an empty RightProjection")
     case Right(v) => v
   }
 
