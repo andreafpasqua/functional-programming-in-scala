@@ -19,20 +19,6 @@ sealed trait List[+A] {
   def toSeq: Vector[A] = foldLeft(Vector[A]())((vec, a) => vec :+ a)
 
   /**
-    * An equality method for lists. Should be tail-recursive.
-    * Notice that overriding the equals method is tricky because it
-    * is used in pattern matching so you will encounter infinite loops
-    * if the equals uses pattern matching itself. The solution was to
-    * define an isEmpty method to decide equality of Nil and make sure
-    * that isEmpty is defined at the level of Nil and Cons, not at the
-    * level of List
-    */
-  override def equals(other: Any): Boolean = other match {
-    case l: List[_] => toSeq == l.toSeq
-    case _ => false
-  }
-
-  /**
     * sums the elements of the list using the implicit zeros and plus methods of Numeric[B]
     */
   def sum[B >: A](implicit num: Numeric[B]): B = foldLeft(num.zero)(num.plus)
@@ -390,14 +376,22 @@ sealed trait List[+A] {
 
 case object Nil extends List[Nothing] {
   override val isEmpty: Boolean = true
-  override def equals(other: Any): Boolean = other match {
-    case l: List[_] => l.isEmpty
-    case _ => false
-  }
 }
 
 case class Cons[+A](h: A, t: List[A]) extends List[A] {
   val isEmpty: Boolean = false
+  /**
+    * An equality method for lists. Should be tail-recursive.
+    * Notice that overriding the equals method is tricky because it
+    * is used in pattern matching for the case object Nil,
+    * so you will encounter infinite loops if you override the equals
+    * of Nil. That's why the easiest way is to override the equals of
+    * Cons only.
+    */
+  override def equals(other: Any): Boolean = other match {
+    case l: List[A] => List.areEqual(this, l)
+    case _ => false
+  }
 
 }
 
@@ -416,6 +410,13 @@ object List {
       if (n == 0) soFar
       else go(n - 1, Cons(a, soFar))
     go(n, Nil)
+  }
+
+  @tailrec
+  def areEqual[A](left: List[A], right: List[A]): Boolean = (left, right) match {
+    case (Nil, Nil) => true
+    case (Cons(h1, t1), Cons(h2, t2)) if h1 == h2 => areEqual(t1, t2)
+    case _ => false
   }
 
   /****************

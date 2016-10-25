@@ -280,7 +280,6 @@ object SamplerTest extends App {
       val prop2 = taken ++ dropped == l
       prop1 && prop2
   }
-
   assert(takeProp.check(maxSize, largeSample, state) == Prop.Passed)
 
   println("* Test filter properties")
@@ -304,7 +303,6 @@ object SamplerTest extends App {
   assert(satisfiesP.check(maxSize, largeSample, state) == Prop.Passed)
   assert(isContained.check(maxSize, largeSample, state) == Prop.Passed)
   assert(restDoesNotSatisfy.check(maxSize, largeSample, state) == Prop.Passed)
-
 
   println("* Test sequence properties")
   /**
