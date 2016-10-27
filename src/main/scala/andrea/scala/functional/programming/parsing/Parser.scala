@@ -1,7 +1,7 @@
 package andrea.scala.functional.programming.parsing
 
 import andrea.scala.functional.programming.testing.{Prop, Sampler}
-import andrea.scala.functional.programming.either.{Either, Left, Right}
+import andrea.scala.functional.programming.either.{Either, Left}
 
 import scala.util.matching.Regex
 
@@ -11,10 +11,34 @@ import scala.util.matching.Regex
 
 case class Parser[E, +T](run: String => Either[E, T]) {
 
+  /**
+    * Parses a string and then uses a function f to obtain from the result
+    * a new parser that is used to parse the remainder of the string
+    */
+  def flatMap[S](f: T => Parser[E, S]): Parser[E, S] = ???
+
+  /**
+    * Returns a parser for just the part of the input string that
+    * this parsed successfully if any
+    */
+  def slice: Parser[E, String] = ???
+
+  /**
+    * Attaches a specified error message s to this
+    */
+  def label(s: String): Parser[E, T] = ???
+
+  /**
+    * Construct a parser that acts like this but if this fails acts on
+    * the same imput like other
+    */
   def or[TT >: T](other: => Parser[E, TT]): Parser[E, TT] = Parser(
     string => run(string).left.orElse(other.run(string))
   )
 
+  /**
+    * Same as or
+    */
   def |[TT >: T](other: Parser[E, TT]): Parser[E, TT] = or(other)
 
   /**
@@ -59,18 +83,6 @@ case class Parser[E, +T](run: String => Either[E, T]) {
     } yield f(t, s)
 
   /**
-    * Parses a string and then uses a function f to obtain from the result
-    * a new parser that is used to parse the remainder of the string
-    */
-  def flatMap[S](f: T => Parser[E, S]): Parser[E, S] = ???
-
-  /**
-    * Returns a parser for just the part of the input string that
-    * this parsed successfully if any
-    */
-  def slice: Parser[E, String] = ???
-
-  /**
     * Runs this on the input string and then other on what is left. Returns
     * both outputs as a tuple or a failure in all other cases.
     * Exercise 9.1
@@ -103,7 +115,18 @@ case class Parser[E, +T](run: String => Either[E, T]) {
 
 object Parser {
 
-  trait ParseError
+  /**
+    * A parser that returns a string when fed to it.
+    */
+  def string[E](s: String): Parser[E, String] = ???
+
+  /**
+    * A parser that returns a string fed to it when it matches
+    * the regular expression r
+    *
+    * @return
+    */
+  def regex[E](r: Regex): Parser[E, String] = ???
 
   /**
     * A parser that always fails with error e irrespectively of the
@@ -116,6 +139,12 @@ object Parser {
     * the input string
     */
   def succeed[E, T](t: T): Parser[E, T] = string("").map(_ => t)
+
+  /**
+    * Delays evaluation of the parser p
+    * Exercise 9.5
+    */
+  def delay[E, T](p: => Parser[E, T]): Parser[E, T] = p
 
   /**
     * it combines a list of parser parsers into a parser that looks for the
@@ -134,19 +163,6 @@ object Parser {
     * A parser that returns a character when fed to it as a string
     */
   def char[E](c: Char): Parser[E, Char] = string(c.toString).map(_.charAt(0))
-
-  /**
-    * A parser that returns a string when fed to it.
-    */
-  def string[E](s: String): Parser[E, String] = ???
-
-  /**
-    * A parser that returns a string fed to it when it matches
-    * the regular expression r
-    *
-    * @return
-    */
-  def regex[E](r: Regex): Parser[E, String] = ???
 
   /**
     * A parser that recognizes character c and counts how many times in a row it
@@ -176,9 +192,11 @@ object Parser {
       _ <- char(c).listOfN(digit.toInt)
     } yield digit.toInt
 
-  implicit def stringToParser(s: String): Parser[ParseError, String] = string[ParseError](s)
+  implicit def stringToParser[E](s: String): Parser[E, String] = string[E](s)
 
-  implicit def regexToParser(r: Regex): Parser[ParseError, String] = regex[ParseError](r)
+  implicit def regexToParser[E](r: Regex): Parser[E, String] = regex[E](r)
+
+  implicit def charToParser[E](c: Char): Parser[E, Char] = char[E](c)
 
 }
 
@@ -248,7 +266,9 @@ object ParserLaws {
 
 }
 
-
+/**
+  * Exercise 9.9
+  */
 object JSONParser {
 
   import Parser._
@@ -266,27 +286,37 @@ object JSONParser {
 
   def jNull[P]: Parser[P, JSON] = string("null").map(_ => JNull)
 
-  def jNumber[P]: Parser[P, JSON] = regex[P]("\d".r).map(d => JNumber(d.toDouble))
+  def jNumber[P]: Parser[P, JSON] = "[0-9].".r.many.map(d => JNumber(d.reduce(_ + _).toDouble))
 
-  def jString[P]: Parser[P, JSON] = (char[P]('"') ** regex[P]("""\w"&&[^"]""".r) ** char[P]('"')).map {
+  def jString[P]: Parser[P, JSON] = (char[P]('"') ** """\w"&&[^"]""".r ** char[P]('"')).map {
     case ((_, w), _) => JString(w)
   }
 
-  def jBool[P]: Parser[P, JSON] = regex[P]("[true, false]".r)
-    .map(s => if (s == "true") JBool(true) else JBool(false))
+  def jBool[P]: Parser[P, JSON] = "[true, false]".r.map(
+    s => if (s == "true") JBool(true) else JBool(false))
 
   def splitIn[P, T](p: Parser[P, T], c: Char = ','): Parser[P, List[T]] =
     (p ** ( char[P](c) > p).many).map {case (t, l) => t :: l}
 
   def jArray[P]: Parser[P, JSON] = {
-    val jsonList = char[P]('[') > splitIn(jParser[P].trimmed) < char[P](']')
+    val jsonList = '[' > splitIn(jParser[P].trimmed) < ']'
     jsonList.map(list => JArray(list.toVector))
   }
 
   def jObject[P]: Parser[P, JSON] = {
     val kVpair = jString[P].trimmed.slice ** (char[P](':') > jParser[P].trimmed)
-    val jsonList = char[P]('{') > splitIn(kVpair) < char[P]('}')
+    val jsonList = '{' > splitIn(kVpair) < '}'
     jsonList.map(list => JObject(list.toMap))
   }
 
 }
+
+case class Location(input: String, offset: Int) {
+  lazy val line = input.slice(0, offset + 1).count(_ == '\n') + 1
+  lazy val column = input.slice(0, offset + 1).lastIndexOf('\n') match {
+    case -1 => offset + 1
+    case n => offset - n
+  }
+}
+
+case class ParseError(location: Location, msg: String)
