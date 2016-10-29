@@ -34,16 +34,16 @@ object JSONParser {
     s => if (s == "true") JBool(true) else JBool(false))
 
   def splitIn[T](p: Parser[T], c: Char = ','): Parser[List[T]] =
-    (p ** ( char(c) > p).many).map {case (t, l) => t :: l}
+    (p ** ( char(c) >> p).many).map {case (t, l) => t :: l}
 
   def jArray: Parser[JSON] = {
-    val jsonList = '[' > splitIn(jParser.trimmed) < ']'
+    val jsonList = '[' >> splitIn(jParser.trimmed) << ']'
     jsonList.map(list => JArray(list.toVector))
   }
 
   def jObject: Parser[JSON] = {
-    val kVpair = jString.trimmed.slice ** (char(':') > jParser.trimmed)
-    val jsonList = '{' > splitIn(kVpair) < '}'
+    val kVpair = jString.trimmed.slice ** (char(':') >> jParser.trimmed)
+    val jsonList = '{' >> splitIn(kVpair) << '}'
     jsonList.map(list => JObject(list.toMap))
   }
 

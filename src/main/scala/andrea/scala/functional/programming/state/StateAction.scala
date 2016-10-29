@@ -47,6 +47,13 @@ case class StateAction[State, +T](run: (State) => (T, State)) {
   def both[S](other: StateAction[State, S]): StateAction[State, (T, S)] = map2(other)((_, _))
 
   /**
+    * Combines two actions but it only retains the value of the other action.
+    * However the first action will still affect the state
+    * @return
+    */
+  def >>[S](other: StateAction[State, S]): StateAction[State, S] = map2(other){case (_, s) => s}
+
+  /**
     * Given a state runs the action and extracts the value
     */
   def runAndGetValue(state: State): T = run(state)._1
@@ -129,8 +136,6 @@ object StateAction {
 
   /**
     * Implements an action that returns the next non negative integer in [0, Int.MaxValue]
-    *
-    * @return
     */
   def nextNonNegativeInt: RandAction[Int] = nextInt.map(i => if (i < 0 ) -(i + 1) else i)
 

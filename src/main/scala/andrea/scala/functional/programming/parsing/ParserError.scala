@@ -5,7 +5,15 @@ package andrea.scala.functional.programming.parsing
   */
 
 
-case class ParserError(stack: List[(Location, String)])
+case class ParserError(stack: List[(Location, String)]) {
+
+  /**
+    * Modifies the stack by mapping it through f
+    */
+  def map(f: List[(Location, String)] => List[(Location, String)]): ParserError =
+    ParserError(f(stack))
+
+}
 
 case class Location(input: String, offset: Int) {
   lazy val line = input.slice(0, offset + 1).count(_ == '\n') + 1
