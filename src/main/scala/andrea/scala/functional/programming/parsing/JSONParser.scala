@@ -9,7 +9,7 @@ package andrea.scala.functional.programming.parsing
   */
 object JSONParser {
 
-  import Parser._
+  import Parsers._
 
   sealed trait JSON
   case object JNull extends JSON
@@ -19,29 +19,29 @@ object JSONParser {
   case class JArray(get: IndexedSeq[JSON]) extends JSON
   case class JObject(get: Map[String, JSON]) extends JSON
 
-  def jParser: Parser[JSON] =
+  def jParser: Parsers[JSON] =
     jNull | jNumber | jString | jBool | jArray | jObject
 
-  def jNull: Parser[JSON] = string("null").map(_ => JNull)
+  def jNull: Parsers[JSON] = string("null").map(_ => JNull)
 
-  def jNumber: Parser[JSON] = "[0-9].".r.many.map(d => JNumber(d.reduce(_ + _).toDouble))
+  def jNumber: Parsers[JSON] = "[0-9].".r.many.map(d => JNumber(d.reduce(_ + _).toDouble))
 
-  def jString: Parser[JSON] = (char('"') ** """\w"&&[^"]""".r ** char('"')).map {
+  def jString: Parsers[JSON] = (char('"') ** """\w"&&[^"]""".r ** char('"')).map {
     case ((_, w), _) => JString(w)
   }
 
-  def jBool: Parser[JSON] = "[true, false]".r.map(
+  def jBool: Parsers[JSON] = "[true, false]".r.map(
     s => if (s == "true") JBool(true) else JBool(false))
 
-  def splitIn[T](p: Parser[T], c: Char = ','): Parser[List[T]] =
+  def splitIn[T](p: Parsers[T], c: Char = ','): Parsers[List[T]] =
     (p ** ( char(c) >> p).many).map {case (t, l) => t :: l}
 
-  def jArray: Parser[JSON] = {
+  def jArray: Parsers[JSON] = {
     val jsonList = '[' >> splitIn(jParser.trimmed) << ']'
     jsonList.map(list => JArray(list.toVector))
   }
 
-  def jObject: Parser[JSON] = {
+  def jObject: Parsers[JSON] = {
     val kVpair = jString.trimmed.slice ** (char(':') >> jParser.trimmed)
     val jsonList = '{' >> splitIn(kVpair) << '}'
     jsonList.map(list => JObject(list.toMap))
