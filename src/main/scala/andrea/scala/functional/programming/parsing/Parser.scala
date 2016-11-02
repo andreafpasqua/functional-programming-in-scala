@@ -9,62 +9,98 @@ import scala.util.matching.Regex
   * Created by andreapasqua on 10/24/2016.
   */
 
-sealed trait Parsers[+T] {
+case class Parser[+T](parse: StateAction[String, Either[ParserError, T]]) {
 
-  def run(s: String): Either[ParserError, T]
+  def run(s: String): Either[ParserError, T] = parse.runAndGetValue(s)
 
   /**
     * Parses a string and then uses a function f to obtain from the result
     * a new parser that is used to parse the remainder of the string
+    * Exercise 9.9
     */
-  def flatMap[S](f: T => Parsers[S]): Parsers[S]
+  def flatMap[S](f: T => Parser[S]): Parser[S] = Parser(
+    parse.flatMap {
+      case l @ Left(_) => StateAction.unit(l)
+      case Right(t) => f(t).parse
+    }
+  )
 
   /**
     * Returns a parser for just the part of the input string that
     * this parsed successfully if any
+    * Exercise 9.9
     */
-  def slice: Parsers[String]
+  def slice: Parser[String] = Parser(
+    StateAction.getState.both(parse).both(StateAction.getState).map {
+      case ((input, result), unParsed) =>
+        result.right.map(_ => input.dropRight(unParsed.length))
+    }
+  )
+
+  /**
+    * Auxiliary functions for modifying the error stack
+    * of a parser remapping it with f
+    * Exercise 9.9
+    */
+  private def modifyStack(f: List[(Location, String)] => List[(Location, String)]) =
+    Parser(parse.map(_.left.map(_.map(f))))
 
   /**
     * Attaches a specified error message s to this
+    * Exercise 9.9
     */
-  def label(s: String): Parsers[T]
+  def label(s: String): Parser[T] = modifyStack {
+    case (loc, msg) :: tail => (loc, s) :: tail
+  }
 
   /**
     * Adds a specified error message s to to the stack of this without
     * erasing previous labels
+    * Exercise 9.9
     */
-  def scope(s: String): Parsers[T]
+  def scope(s: String): Parser[T] = modifyStack {
+    case (loc, msg) :: tail => (loc, s) :: (loc, msg) :: tail
+  }
 
   /**
     * Marks this (and anything built from this without branching, e.g.
     * without or) as an attempt, meaning that if the parsing fails it
     * switches to the other branch without executing the remainder
     */
-  def attempt: Parsers[T]
+  def attempt: Parser[T] = ???
 
   /**
     * Reports only the error that occurred last,
     * i.e. the top of the stack
+    * Exercise 9.9
     */
-  def latest: Parsers[T]
+  def latest: Parser[T] = modifyStack(_.take(1))
 
   /**
     * Returns the error with the furthest position,
     * i.e. the one with the largest position
+    * Exercise 9.9
     */
-  def furthest: Parsers[T]
+  def furthest: Parser[T] = modifyStack {
+    stack => List(stack.maxBy {case (location, _) => location.offset})
+  }
 
   /**
     * Construct a parser that acts like this but if this fails acts on
-    * the same imput like other
+    * the same input like other
+    * Exercise 9.9
     */
-  def or[TT >: T](other: => Parsers[TT]): Parsers[TT]
+  def or[TT >: T](other: => Parser[TT]): Parser[TT] = Parser(
+    StateAction.getState.both(parse).flatMap {
+      case (input, Left(_)) => StateAction.setState(input) >> other.parse
+      case (_, t@Right(_)) => StateAction.unit(t)
+    }
+  )
 
   /**
     * Same as or
     */
-  def |[TT >: T](other: Parsers[TT]): Parsers[TT] = or(other)
+  def |[TT >: T](other: Parser[TT]): Parser[TT] = or(other)
 
   /**
     * a parser that recognizes the same object as this and returns a list of
@@ -72,36 +108,35 @@ sealed trait Parsers[+T] {
     * string.
     * Exercise 9.3
     */
-  def many: Parsers[List[T]] = map2(many)(_ :: _) or Parsers.succeed(Nil)
+  def many: Parser[List[T]] = map2(many)(_ :: _) or Parser.succeed(Nil)
 
   /**
     * The same as many, but failing if there are no initial substrings of
     * the type this looks for
     * Exercise 9.1
     */
-  def many1: Parsers[List[T]] = map2(many) { case (t, list) => t :: list}
+  def many1: Parser[List[T]] = map2(many) { case (t, list) => t :: list}
 
   /**
     * A parser that looks at the beginning of the input string
     * for n subsequent instances of the substring this is sensitive to.
     * Exercise 9.4
     */
-  def listOfN(n: Int): Parsers[List[T]] =
-    if (n > 0) map2(listOfN(n - 1))(_ :: _) else Parsers.succeed(Nil)
-
+  def listOfN(n: Int): Parser[List[T]] =
+    if (n > 0) map2(listOfN(n - 1))(_ :: _) else Parser.succeed(Nil)
 
   /**
     * Parses the string with this and then maps the result (if any) with f
     * Exercise 9.8
     */
-  def map[S](f: T => S): Parsers[S] = flatMap(t => Parsers.succeed(f(t)))
+  def map[S](f: T => S): Parser[S] = flatMap(t => Parser.succeed(f(t)))
 
   /**
     * Parses the string with this and then parses what is left with other
     * and then combines the results using f
     * Exercise 9.7
     */
-  def map2[S, U](other: => Parsers[S])(f: (T, S) => U): Parsers[U] =
+  def map2[S, U](other: => Parser[S])(f: (T, S) => U): Parser[U] =
     for {
       t <- this
       s <- other
@@ -112,33 +147,33 @@ sealed trait Parsers[+T] {
     * both outputs as a tuple or a failure in all other cases.
     * Exercise 9.1
     */
-  def product[S](other: => Parsers[S]): Parsers[(T, S)] = map2(other)((_, _))
+  def product[S](other: => Parser[S]): Parser[(T, S)] = map2(other)((_, _))
 
   /**
     * Same as product
     */
-  def **[S](other: => Parsers[S]): Parsers[(T, S)] = product(other)
+  def **[S](other: => Parser[S]): Parser[(T, S)] = product(other)
 
   /**
     * It uses this to delete the corresponding portion of the input and
     * then parse what is left with other
     */
-  def >>[S](other: Parsers[S]): Parsers[S] = **(other).map(_._2)
+  def >>[S](other: Parser[S]): Parser[S] = **(other).map(_._2)
 
   /**
     * It uses this to parse and other to delete its corresponding portion of the input
     * from what is left after this
     */
-  def <<[S](other: Parsers[S]): Parsers[T] = **(other).map(_._1)
+  def <<[S](other: Parser[S]): Parser[T] = **(other).map(_._1)
 
   /**
     * Removes leading and trailing spaces from the string input before parsing it
     * with this
     */
-  def trimmed: Parsers[T] = Parsers.char(' ').many >> this << Parsers.char(' ')
+  def trimmed: Parser[T] = Parser.char(' ').many >> this << Parser.char(' ')
 }
 
-object Parsers {
+object Parser {
 
   /**
     * A parser that returns a string when fed to it.
@@ -181,15 +216,19 @@ object Parsers {
 
   /**
     * a parser that always returns successfully the value t irrespectively of
-    * the input string
+    * the input string. Note you cannot implement it using map if map uses it
+    * (through flatMap)
     */
-  def succeed[T](t: T): Parsers[T] = string("").map(_ => t)
+  def succeed[T](t: T): Parser[T] = Parser(StateAction(input => (Right(t), input)))
 
   /**
     * Delays evaluation of the parser p
     * Exercise 9.5
     */
-  def delay[T](p: => Parsers[T]): Parsers[T] = p
+  def delay[T](p: => Parser[T]): Parser[T] = {
+    val action = StateAction((input: String) => p.parse.run(input))
+    Parser(action)
+  }
 
   /**
     * it combines a list of parser parsers into a parser that looks for the
@@ -197,9 +236,8 @@ object Parsers {
     * then the target of the second at the beginning of what is left
     * and so on. Finally it puts the outputs in a list that preserves
     * the order.
-    *
     */
-  def sequence[T](parsers: List[Parsers[T]]): Parsers[List[T]] =
+  def sequence[T](parsers: List[Parser[T]]): Parser[List[T]] =
     parsers.foldRight(succeed[List[T]](Nil)) {
       case (p, soFar) => p.map2(soFar){ case (t, list) => t :: list}
     }
@@ -207,18 +245,18 @@ object Parsers {
   /**
     * A parser that returns a character when fed to it as a string
     */
-  def char(c: Char): Parsers[Char] = string(c.toString).map(_.charAt(0))
+  def char(c: Char): Parser[Char] = string(c.toString).map(_.charAt(0))
 
   /**
     * A parser that recognizes character c and counts how many times in a row it
     * is present at the beginning of the input string
     */
-  def countChar(c: Char): Parsers[Int] = char(c).many.slice.map(_.length)
+  def countChar(c: Char): Parser[Int] = char(c).many.slice.map(_.length)
 
   /**
     * Same as countChar, but it fails if there is not at least one instance of c
     */
-  def countChar1(c: Char): Parsers[Int] = char(c).many1.slice.map(_.length)
+  def countChar1(c: Char): Parser[Int] = char(c).many1.slice.map(_.length)
 
   /**
     * Counts how many times c1 occurs at the beginning of the string, and how many times
@@ -231,111 +269,16 @@ object Parsers {
     * Parses a single digit if it is followed by as many instances of the
     * character c
     */
-  def numFollowedByAsMany(c: Char): Parsers[Int] =
+  def numFollowedByAsMany(c: Char): Parser[Int] =
     for {
       digit <- regex("[0-9]".r)
       _ <- char(c).listOfN(digit.toInt)
     } yield digit.toInt
 
-  implicit def stringToParser(s: String): Parsers[String] = string(s)
+  implicit def stringToParser(s: String): Parser[String] = string(s)
 
-  implicit def regexToParser(r: Regex): Parsers[String] = regex(r)
+  implicit def regexToParser(r: Regex): Parser[String] = regex(r)
 
-  implicit def charToParser(c: Char): Parsers[Char] = char(c)
-
-}
-
-
-case class Parser[+T](parse: StateAction[String, Either[ParserError, T]]
-                       ) extends Parsers[T] {
-
-  def run(s: String): Either[ParserError, T] = parse.runAndGetValue(s)
-
-  /**
-    * Parses a string and then uses a function f to obtain from the result
-    * a new parser that is used to parse the remainder of the string
-    * Exercise 9.9
-    */
-  def flatMap[S](f: T => Parsers[S]): Parser[S] = Parser(
-    parse.flatMap {
-      case l @ Left(_) => StateAction.unit(l)
-      case Right(t) => f(t).asInstanceOf[Parser[S]].parse
-    }
-  )
-
-  /**
-    * Returns a parser for just the part of the input string that
-    * this parsed successfully if any
-    * Exercise 9.9
-    */
-  def slice: Parser[String] = Parser(
-    StateAction.getState.both(parse).both(StateAction.getState).map {
-      case ((input, result), unParsed) =>
-        result.right.map(_ => input.dropRight(unParsed.length))
-    }
-  )
-
-  /**
-    * Auxiliary functions for modifying the error stack
-    * of a parser remapping it with f
-    * Exercise 9.9
-    */
-  private def modifyStack(
-                           f: List[(Location, String)] => List[(Location, String)])
-  : Parser[T] = Parser(
-    parse.map(_.left.map(_.map(f)))
-  )
-
-  /**
-    * Attaches a specified error message s to this
-    * Exercise 9.9
-    */
-  def label(s: String): Parser[T] = modifyStack {
-    case (loc, msg) :: tail => (loc, s) :: tail
-  }
-
-  /**
-    * Adds a specified error message s to to the stack of this without
-    * erasing previous labels
-    * Exercise 9.9
-    */
-  def scope(s: String): Parser[T] = modifyStack {
-    case (loc, msg) :: tail => (loc, s) :: (loc, msg) :: tail
-  }
-
-  /**
-    * Marks this (and anything built from this without branching, e.g.
-    * without or) as an attempt, meaning that if the parsing fails it
-    * switches to the other branch without executing the remainder
-    */
-  def attempt: Parsers[T] = ???
-
-  /**
-    * Reports only the error that occurred last,
-    * i.e. the top of the stack
-    * Exercise 9.9
-    */
-  def latest: Parser[T] = modifyStack(_.take(1))
-
-  /**
-    * Returns the error with the furthest position,
-    * i.e. the one with the largest position
-    * Exercise 9.9
-    */
-  def furthest: Parser[T] = modifyStack {
-    stack => List(stack.maxBy {case (location, _) => location.offset})
-  }
-
-  /**
-    * Construct a parser that acts like this but if this fails acts on
-    * the same input like other
-    * Exercise 9.9
-    */
-  def or[TT >: T](other: => Parsers[TT]): Parser[TT] = Parser(
-    StateAction.getState.both(parse).flatMap {
-      case (input, Left(_)) => StateAction.setState(input) >> other.asInstanceOf[Parser[TT]].parse
-      case (_, t@Right(_)) => StateAction.unit(t)
-    }
-  )
+  implicit def charToParser(c: Char): Parser[Char] = char(c)
 
 }
