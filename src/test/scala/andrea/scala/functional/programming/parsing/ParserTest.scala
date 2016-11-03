@@ -16,21 +16,21 @@ object ParserTest extends App {
       * A utility to test that two parsers p1, p2 are equivalent, in the same that
       * they produce the same output on all strings.
       */
-    def areEqual[T](p1: Parser[T], p2: Parser[T]): Prop =
+    def areEqual[T](p1: MyParser[T], p2: MyParser[T]): Prop =
       Sampler.string(100).forall(string => p1.run(string) == p2.run(string))
 
     /**
       * The proposition that a parser p is left unaltered when mapped with the identify
       */
-    def mapLaw[T](p: Parser[T]): Prop = areEqual(p, p.map(identity))
+    def mapLaw[T](p: MyParser[T]): Prop = areEqual(p, p.map(identity))
 
     /**
       * A law that must be satisfied by string
       */
     def stringLaw: Prop =
-      Sampler.string(100).forall(s => Parser.string(s).run(s).right.get == s) &&
+      Sampler.string(100).forall(s => MyParser.string(s).run(s).right.get == s) &&
         Sampler.listOfN(Sampler.string(100), 2).forall {
-          case List(s1, s2) if s1 != s2 => Parser.string(s1).run(s2).isLeft
+          case List(s1, s2) if s1 != s2 => MyParser.string(s1).run(s2).isLeft
           case _ => true
         }
 
@@ -43,7 +43,7 @@ object ParserTest extends App {
         t <- sampler
       } yield (s, t)
       stringAndValue.forall {
-        case (s, t) => Parser.succeed(t).run(s) == t
+        case (s, t) => MyParser.succeed(t).run(s) == t
       }
     }
 
@@ -53,7 +53,7 @@ object ParserTest extends App {
       * Exercise 9.2
       */
     def productLaw[T1, T2, T3, S1, S2]
-    (p1: Parser[T1], p2: Parser[T2], p3: Parser[T3])
+    (p1: MyParser[T1], p2: MyParser[T2], p3: MyParser[T3])
     (f1: Sampler[T1 => S1], f2: Sampler[T2 => S2]): Prop =
       areEqual(
         ((p1 ** p2) ** p3).map { case ((t1, t2), t3) => (t1, t2, t3)},
@@ -74,7 +74,7 @@ object ParserTest extends App {
 
   }
 
-  import Parser._
+  import MyParser._
   println("* Test string")
   assert("ciao ciao".run("ciao ciao bella") == Right("ciao ciao"))
   assert("ciao ciao".run("cia").left.get.stack.head._1.offset == 3)
@@ -97,7 +97,7 @@ object ParserTest extends App {
   assert(delayedSucceed.run("ciao") == Right(10))
 
   println("* Test sequence")
-  val sequenceParser = sequence(List[Parser[String]]("ciao", " ", "5", " ", "ciao"))
+  val sequenceParser = sequence(List[MyParser[String]]("ciao", " ", "5", " ", "ciao"))
   assert(sequenceParser.run("ciao 5 ciao") == Right(List("ciao", " ", "5", " ", "ciao")))
   assert(sequenceParser.run("ciao 6 ciao").left.get.stack.head._1.offset == 0)
 

@@ -21,4 +21,6 @@ case class Location(input: String, offset: Int) {
     case -1 => offset + 1
     case n => offset - n
   }
+  def unParsed: String = input.drop(offset - 1)
+  def parsed: String = input.take(offset - 1)
 }
