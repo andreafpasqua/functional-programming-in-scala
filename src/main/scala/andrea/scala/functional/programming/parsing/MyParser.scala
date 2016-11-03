@@ -8,9 +8,10 @@ import scala.util.matching.Regex
   * Created by andreapasqua on 10/24/2016.
   */
 
-case class MyParser[+T](parse: StateAction[Location, Either[ParserError, T]]) extends Parsers[T, MyParser[T]] {
+case class MyParser[+T](action: StateAction[ParserState, Either[ParserError, T]]) extends Parsers[T, MyParser[T]] {
 
-  def run(s: Location): Either[ParserError, T] = parse.runAndGetValue(s)
+
+  def run(s: ParserState): (Either[ParserError, T], ParserState) = action.run(s)
 
   /**
     * Parses a string and then uses a function f to obtain from the result
@@ -18,9 +19,9 @@ case class MyParser[+T](parse: StateAction[Location, Either[ParserError, T]]) ex
     * Exercise 9.9
     */
   def flatMap[S](f: T => Parsers[S, MyParser[S]]): MyParser[S] = MyParser(
-    parse.flatMap {
+    action.flatMap {
       case l @ Left(_) => StateAction.unit(l)
-      case Right(t) => f(t).parse
+      case Right(t) => StateAction(f(t).run)
     }
   )
 
@@ -30,9 +31,9 @@ case class MyParser[+T](parse: StateAction[Location, Either[ParserError, T]]) ex
     * Exercise 9.9
     */
   def slice: MyParser[String] = MyParser(
-    StateAction.getState.both(parse).both(StateAction.getState).map {
-      case ((_, result), loc) =>
-        result.right.map(_ => loc.parsed)
+    action.both(StateAction.getState).map {
+      case (result, state) =>
+        result.right.map(_ => state.location.parsed)
     }
   )
 
@@ -42,7 +43,7 @@ case class MyParser[+T](parse: StateAction[Location, Either[ParserError, T]]) ex
     * Exercise 9.9
     */
   private def modifyStack(f: List[(Location, String)] => List[(Location, String)]) =
-    MyParser(parse.map(_.left.map(_.map(f))))
+    MyParser(action.map(_.left.map(_.map(f))))
 
   /**
     * Attaches a specified error message s to this
@@ -89,12 +90,19 @@ case class MyParser[+T](parse: StateAction[Location, Either[ParserError, T]]) ex
     * the same input like other
     * Exercise 9.9
     */
-  def or[TT >: T](other: => MyParser[TT]): MyParser[TT] = MyParser(
-    StateAction.getState.both(parse).flatMap {
-      case (loc, Left(_)) => StateAction.setState(loc) >> other.parse
+  def or[TT >: T](other: => Parsers[TT, MyParser[TT]]): MyParser[TT] = MyParser(
+    StateAction.getState.both(action).flatMap {
+      case (s, Left(_)) => StateAction.setState(s) >> StateAction(other.run)
       case (_, t@Right(_)) => StateAction.unit(t)
     }
   )
+
+  /**
+    * a parser that always returns successfully the value t irrespectively of
+    * the input string. This doesn't use this but we put it here
+    * so it can be used in other
+    */
+  def succeed[TT >: T](t: TT): MyParser[TT] = MyParser.succeed(t)
 
 }
 
@@ -106,14 +114,17 @@ object MyParser {
     */
   def string(s: String): MyParser[String] = {
     val action = StateAction(
-      (loc: Location) => loc.unParsed.zip(s).indexWhere{ case (c1, c2) => c1 != c2} match {
-        case -1 if s.length <= loc.unParsed.length => // parsed successfully
-          (Right(s), loc.copy(offset = loc.offset + s.length))
-        case index => //input differs
-          val offset = if (index == -1) loc.input.length else index + s.length
-          val newLoc = loc.copy(offset = offset)
-          val error = (newLoc, s"input differs from expected string $s")
-          (Left(ParserError(List(error))), newLoc)
+      (state: ParserState) => {
+        val loc = state.location
+        val unParsed = loc.unParsed
+        unParsed.zip(s).indexWhere { case (c1, c2) => c1 != c2 } match {
+          case -1 if s.length <= unParsed.length => // parsed successfully
+            (Right(s), state + s.length)
+          case index => //input differs
+            val errorLoc = if (index == -1) unParsed.length else index + s.length
+            val error = (loc + errorLoc, s"input differs from expected string $s")
+            (Left(ParserError(List(error))), state + errorLoc)
+        }
       }
     )
     MyParser(action)
@@ -126,14 +137,14 @@ object MyParser {
     */
   def regex(r: Regex): MyParser[String] = {
     val action = StateAction(
-      (loc: Location) =>
+      (state: ParserState) =>
       {
-        val firstMatch = r.findPrefixMatchOf(loc.unParsed)
+        val firstMatch = r.findPrefixMatchOf(state.location.unParsed)
         firstMatch match {
           case None =>
-            val error = (loc, s"input does not match regular expression $r")
-            (Left(ParserError(List(error))), loc)
-          case Some(s) => (Right(s.toString), loc.copy(offset = loc.offset + s.toString.length))
+            val error = (state.location, s"input does not match regular expression $r")
+            (Left(ParserError(List(error))), state)
+          case Some(s) => (Right(s.toString), state + s.toString.length)
         }
       }
     )
@@ -145,16 +156,13 @@ object MyParser {
     * the input string. Note you cannot implement it using map if map uses it
     * (through flatMap)
     */
-  def succeed[T](t: T): MyParser[T] = MyParser(StateAction(input => (Right(t), input)))
+  def succeed[T](t: T): MyParser[T] = MyParser(StateAction((Right(t), _)))
 
   /**
     * Delays evaluation of the parser p
     * Exercise 9.5
     */
-  def delay[T](p: => MyParser[T]): MyParser[T] = {
-    val action = StateAction((input: String) => p.parse.run(input))
-    MyParser(action)
-  }
+  def delay[T](p: => Parsers[T, MyParser[T]]): MyParser[T] = MyParser(StateAction(p.run))
 
   /**
     * it combines a list of parser parsers into a parser that looks for the
@@ -165,7 +173,8 @@ object MyParser {
     */
   def sequence[T](parsers: List[MyParser[T]]): MyParser[List[T]] =
     parsers.foldRight(succeed[List[T]](Nil)) {
-      case (p, soFar) => p.map2(soFar){ case (t, list) => t :: list}
+      case (p, soFar) =>
+        p.map2(soFar){ case (t, list) => t :: list}
     }
 
   /**
@@ -177,12 +186,12 @@ object MyParser {
     * A parser that recognizes character c and counts how many times in a row it
     * is present at the beginning of the input string
     */
-  def countChar(c: Char): MyParser[Int] = char(c).many.slice.map(_.length)
+  def countChar(c: Char): Parsers[Int, MyParser[Int]] = char(c).many.slice.map(_.length)
 
   /**
     * Same as countChar, but it fails if there is not at least one instance of c
     */
-  def countChar1(c: Char): MyParser[Int] = char(c).many1.slice.map(_.length)
+  def countChar1(c: Char): Parsers[Int, MyParser[Int]] = char(c).many1.slice.map(_.length)
 
   /**
     * Counts how many times c1 occurs at the beginning of the string, and how many times

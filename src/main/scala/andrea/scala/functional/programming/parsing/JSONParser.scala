@@ -47,4 +47,12 @@ object JSONParser {
     jsonList.map(list => JObject(list.toMap))
   }
 
+
+  /**
+    * Removes leading and trailing spaces from the string input before parsing it
+    * with this
+    */
+  def trimmed[TT >: T]: Parsers[TT, MyParser[TT]] = MyParser.char(' ').many >>
+    this.asInstanceOf[Parsers[TT, MyParser[TT]]] << MyParser.char(' ').many
+
 }

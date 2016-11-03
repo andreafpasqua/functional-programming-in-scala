@@ -23,4 +23,12 @@ case class Location(input: String, offset: Int) {
   }
   def unParsed: String = input.drop(offset - 1)
   def parsed: String = input.take(offset - 1)
+
+  def +(n: Int) = copy(offset = offset + n)
+}
+
+case class ParserState(location: Location) {
+
+  def +(n: Int) = ParserState(location + n)
+
 }
