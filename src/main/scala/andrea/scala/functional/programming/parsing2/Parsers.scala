@@ -200,9 +200,9 @@ trait Parsers[Parser[+_]] {
 
   implicit def charToParser(c: Char): Parser[Char] = char(c)
 
-//  implicit def operators[T](p: Parser[T]): ParserOps[T] = ParserOps[T](p)
+  implicit def operators[T](p: Parser[T]): ParserOps[T] = ParserOps[T](p)
 
-  implicit case class ParserOps[T](p: Parser[T]) {
+  case class ParserOps[T](p: Parser[T]) {
 
     def flatMap[S](f: T => Parser[S]): Parser[S] = self.flatMap[T, S](p)(f)
 

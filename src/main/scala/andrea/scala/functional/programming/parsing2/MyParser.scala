@@ -8,15 +8,15 @@ import scala.util.matching.Regex
   * Created by andreapasqua on 10/24/2016.
   */
 
-case class MyParser[+T](
-  action: StateAction[ParserState, Either[ParserError, T]]) extends Parsers[MyParser[T]] {
+case class MyParser[+T](action: StateAction[ParserState, Either[ParserError, T]])
+  extends Parsers[MyParser] {
 
   /**
     * Parses a string and then uses a function f to obtain from the result
     * a new parser that is used to parse the remainder of the string
     * Exercise 9.9
     */
-  def flatMap[TT >: T, S](p: MyParser[T], f: T => MyParser[S]): MyParser[S] = MyParser(
+  def flatMap[TT >: T, S](p: MyParser[TT])(f: TT => MyParser[S]): MyParser[S] = MyParser(
     p.action.flatMap {
       case l @ Left(_) => StateAction.unit(l)
       case Right(t) => f(t).action
@@ -101,9 +101,6 @@ case class MyParser[+T](
     }
   )
 
-}
-
-object MyParser {
   /**
     * A parser that returns a string when fed to it.
     * Exercise 9.9
@@ -152,6 +149,6 @@ object MyParser {
     * the input string. Note you cannot implement it using map if map uses it
     * (through flatMap)
     */
-  def succeed[T](t: T): MyParser[T] = MyParser(StateAction((Right(t), _)))
+  def succeed[TT >: T](t: TT): MyParser[TT] = MyParser(StateAction((Right(t), _)))
 
 }
