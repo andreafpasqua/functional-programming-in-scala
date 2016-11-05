@@ -1,4 +1,4 @@
-package andrea.scala.functional.programming.parsing
+package andrea.scala.functional.programming.parsing2
 
 import andrea.scala.functional.programming.either.{Either, Left, Right}
 import andrea.scala.functional.programming.state.StateAction
@@ -8,18 +8,16 @@ import scala.util.matching.Regex
   * Created by andreapasqua on 10/24/2016.
   */
 
-case class MyParser[+T](action: StateAction[ParserState, Either[ParserError, T]]) extends Parsers[T, MyParser[T]] {
-
-
-  def run(s: ParserState): (Either[ParserError, T], ParserState) = action.run(s)
+case class MyParser[+T](
+  action: StateAction[ParserState, Either[ParserError, T]]) extends Parsers[MyParser[T]] {
 
   /**
     * Parses a string and then uses a function f to obtain from the result
     * a new parser that is used to parse the remainder of the string
     * Exercise 9.9
     */
-  def flatMap[S](f: T => MyParser[S]): MyParser[S] = MyParser(
-    action.flatMap {
+  def flatMap[TT >: T, S](p: MyParser[T], f: T => MyParser[S]): MyParser[S] = MyParser(
+    p.action.flatMap {
       case l @ Left(_) => StateAction.unit(l)
       case Right(t) => f(t).action
     }
@@ -30,8 +28,8 @@ case class MyParser[+T](action: StateAction[ParserState, Either[ParserError, T]]
     * this parsed successfully if any
     * Exercise 9.9
     */
-  def slice: MyParser[String] = MyParser(
-    action.both(StateAction.getState).map {
+  def slice[TT >: T](p: MyParser[TT]): MyParser[String] = MyParser(
+    p.action.both(StateAction.getState).map {
       case (result, state) =>
         result.right.map(_ => state.location.parsed)
     }
@@ -49,7 +47,7 @@ case class MyParser[+T](action: StateAction[ParserState, Either[ParserError, T]]
     * Attaches a specified error message s to this
     * Exercise 9.9
     */
-  def label(s: String): MyParser[T] = modifyStack {
+  def label[TT >: T](p: MyParser[TT])(s: String): MyParser[TT] = modifyStack {
     case (loc, msg) :: tail => (loc, s) :: tail
   }
 
@@ -58,7 +56,7 @@ case class MyParser[+T](action: StateAction[ParserState, Either[ParserError, T]]
     * erasing previous labels
     * Exercise 9.9
     */
-  def scope(s: String): MyParser[T] = modifyStack {
+  def scope[TT >: T](p: MyParser[TT])(s: String): MyParser[TT] = modifyStack {
     case (loc, msg) :: tail => (loc, s) :: (loc, msg) :: tail
   }
 
@@ -67,49 +65,45 @@ case class MyParser[+T](action: StateAction[ParserState, Either[ParserError, T]]
     * without or) as an attempt, meaning that if the parsing fails it
     * switches to the other branch without executing the remainder
     */
-  def attempt: MyParser[T] = ???
+  def attempt[TT >: T](p: MyParser[TT]): MyParser[TT] = ???
 
   /**
     * Reports only the error that occurred last,
     * i.e. the top of the stack
     * Exercise 9.9
     */
-  def latest: MyParser[T] = modifyStack(_.take(1))
+  def latest[TT >: T](p: MyParser[TT]): MyParser[TT] = modifyStack(_.take(1))
 
   /**
     * Returns the error with the furthest position,
     * i.e. the one with the largest position
     * Exercise 9.9
     */
-  def furthest: MyParser[T] = modifyStack {
+  def furthest[TT >: T](p: MyParser[TT]): MyParser[TT] = modifyStack {
     stack => List(stack.maxBy {case (location, _) => location.offset})
   }
+
+  /**
+    * Delays evaluation of the parser p
+    * Exercise 9.5
+    */
+  def delay[TT >: T](p: => MyParser[TT]): MyParser[TT] = MyParser(p.action)
 
   /**
     * Construct a parser that acts like this but if this fails acts on
     * the same input like other
     * Exercise 9.9
     */
-  def or[TT >: T](other: => MyParser[TT]): MyParser[TT] = MyParser(
+  def or[TT >: T](p: MyParser[TT], other: => MyParser[TT]): MyParser[TT] = MyParser(
     StateAction.getState.both(action).flatMap {
       case (s, Left(_)) => StateAction.setState(s) >> other.action
       case (_, t@Right(_)) => StateAction.unit(t)
     }
   )
 
-  /**
-    * a parser that always returns successfully the value t irrespectively of
-    * the input string. This doesn't use this but we put it here
-    * so it can be used in other
-    */
-  def succeed[TT >: T](t: TT): MyParser[TT] = MyParser.succeed(t)
-
-  implicit def toParser: MyParser[T] = this
-
 }
 
 object MyParser {
-
   /**
     * A parser that returns a string when fed to it.
     * Exercise 9.9
@@ -159,63 +153,5 @@ object MyParser {
     * (through flatMap)
     */
   def succeed[T](t: T): MyParser[T] = MyParser(StateAction((Right(t), _)))
-
-  /**
-    * Delays evaluation of the parser p
-    * Exercise 9.5
-    */
-  def delay[T](p: => Parsers[T, MyParser[T]]): MyParser[T] = MyParser(StateAction(p.run))
-
-  /**
-    * it combines a list of parser parsers into a parser that looks for the
-    * target of the first parser at the beginning of the input list,
-    * then the target of the second at the beginning of what is left
-    * and so on. Finally it puts the outputs in a list that preserves
-    * the order.
-    */
-  def sequence[T](parsers: List[MyParser[T]]): MyParser[List[T]] =
-    parsers.foldRight(succeed[List[T]](Nil)) {
-      case (p, soFar) =>
-        p.map2(soFar){ case (t, list) => t :: list}
-    }
-
-  /**
-    * A parser that returns a character when fed to it as a string
-    */
-  def char(c: Char): MyParser[Char] = string(c.toString).map(_.charAt(0))
-
-  /**
-    * A parser that recognizes character c and counts how many times in a row it
-    * is present at the beginning of the input string
-    */
-  def countChar(c: Char): Parsers[Int, MyParser[Int]] = char(c).many.slice.map(_.length)
-
-  /**
-    * Same as countChar, but it fails if there is not at least one instance of c
-    */
-  def countChar1(c: Char): Parsers[Int, MyParser[Int]] = char(c).many1.slice.map(_.length)
-
-  /**
-    * Counts how many times c1 occurs at the beginning of the string, and how many times
-    * c2 occurs at the beginning of what is left. But it fails if the second count is zero.
-    * In case of success it presents the two results as a tuple.
-    */
-  def countTwoChars(c1: Char, c2: Char) = countChar(c1) ** countChar1(c2)
-
-  /**
-    * Parses a single digit if it is followed by as many instances of the
-    * character c
-    */
-  def numFollowedByAsMany(c: Char): MyParser[Int] =
-    for {
-      digit <- regex("[0-9]".r)
-      _ <- char(c).listOfN(digit.toInt)
-    } yield digit.toInt
-
-  implicit def stringToParser(s: String): MyParser[String] = string(s)
-
-  implicit def regexToParser(r: Regex): MyParser[String] = regex(r)
-
-  implicit def charToParser(c: Char): MyParser[Char] = char(c)
 
 }

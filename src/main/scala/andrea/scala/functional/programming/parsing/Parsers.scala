@@ -61,7 +61,7 @@ trait Parsers[+T, Parser[+_]] {
     * Construct a parser that acts like this but if this fails acts on
     * the same input like other
     */
-  def or[TT >: T](left: Parser[TT], right: => Parser[TT]): Parser[TT]
+  def or[TT >: T](other: => Parser[TT]): Parser[TT]
 
   /**
     * a parser that always returns successfully the value t irrespectively of
@@ -69,6 +69,9 @@ trait Parsers[+T, Parser[+_]] {
     * so it can be used in other
     */
   def succeed[TT >: T](t: TT): Parser[TT]
+
+  implicit def toParsers[TT >: T](parser: Parser[TT]): Parsers[TT, Parser[TT]]
+
   /**
     * ************ Derived *********************
     */
@@ -76,7 +79,7 @@ trait Parsers[+T, Parser[+_]] {
   /**
     * Same as or
     */
-  def |[TT >: T](left: Parser[TT], right: => Parser[TT]): Parser[TT] = or(left, right)
+  def |[TT >: T](other: => Parser[TT]): Parser[TT] = or(other)
 
   /**
     * a parser that recognizes the same object as this and returns a list of
@@ -84,7 +87,10 @@ trait Parsers[+T, Parser[+_]] {
     * string.
     * Exercise 9.3
     */
-  def many: Parser[List[T]] = or(map2[T, List[T], List[T]](many)(_ :: _), succeed[List[T]](Nil))
+  def many[TT >: T]: Parser[List[TT]] =
+    toParsers[List[TT]](map2(many[TT])(_ :: _)) or[List[TT]] succeed[List[TT]](Nil)
+
+
 
   /**
     * The same as many, but failing if there are no initial substrings of
@@ -112,41 +118,40 @@ trait Parsers[+T, Parser[+_]] {
     * and then combines the results using f
     * Exercise 9.7
     */
-  def map2[TT >: T, S, U](left: Parser[TT], right: => Parser[S])(f: (TT, S) => U): Parser[U] =
-    for {
-      t <- left
-      s <- right
-    } yield f(t, s)
-
-  def map2[TT >: T, S, U](right: => Parser[S])(f: (TT, S) => U): Parser[U] =
+  def map2[TT >: T, S, U](other: => Parser[S])(f: (TT, S) => U): Parser[U] =
     for {
       t <- this
-      s <- right
+      s <- other
     } yield f(t, s)
 
-  /**
+  /**y
     * Runs this on the input string and then other on what is left. Returns
     * both outputs as a tuple or a failure in all other cases.
     * Exercise 9.1
     */
-  def product[TT >: T, S](left: Parser[TT], right: => Parser[S]): Parser[(TT, S)] = map2(left, right)((_, _))
+  def product[TT >: T, S](other: => Parser[S]): Parser[(TT, S)] = map2(other)((_, _))
 
   /**
     * Same as product
     */
-  def **[TT >: T, S](left: Parser[TT], right: => Parser[S]): Parser[(TT, S)] = product(left, right)
+  def **[TT >: T, S](other: => Parser[S]): Parser[(TT, S)] = product(other)
 
   /**
     * It uses this to delete the corresponding portion of the input and
     * then parse what is left with other
     */
-//  def >>[S](other: Parser[S]): Parser[S] = **(other).map(_._2)
+  def >>[S](other: Parser[S]): Parser[S] = **(other).map {case (x, y) => y}
 
   /**
     * It uses this to parse and other to delete its corresponding portion of the input
     * from what is left after this
     */
-//  def <<[TT >: T, S](other: Parser[S]): Parser[TT] = **(other).map(_._1)
+  def <<[TT >: T, S](other: Parser[S]): Parser[TT] = {
+    val temp = toParsers(**(other))
+
+    **(other).map(_._1)
+  }
+
 
   def parse(s: ParserState): Either[ParserError, T] = run(s)._1
 
