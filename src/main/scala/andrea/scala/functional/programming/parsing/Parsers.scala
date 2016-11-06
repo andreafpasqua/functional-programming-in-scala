@@ -226,13 +226,13 @@ trait Parsers[Parser[+_]] {
       * It uses this to delete the corresponding portion of the input and
       * then parses what is left with other
       */
-    def >>[S](other: Parser[S]): Parser[S] = self.map2(p, other) { case (t, s) => s}
+    def >*[S](other: Parser[S]): Parser[S] = self.map2(p, other) { case (t, s) => s}
 
     /**
       * It uses this to parse and other to delete its corresponding portion of the input
       * from what is left after this
       */
-    def <<[S](other: Parser[S]): Parser[T] = self.map2(p, other){ case (t, s) => t}
+    def *<[S](other: Parser[S]): Parser[T] = self.map2(p, other){ case (t, s) => t}
 
   }
 
