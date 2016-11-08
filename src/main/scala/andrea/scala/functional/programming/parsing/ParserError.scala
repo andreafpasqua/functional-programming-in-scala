@@ -21,14 +21,14 @@ case class Location(input: String, offset: Int) {
     case -1 => offset + 1
     case n => offset - n
   }
-  def unParsed: String = input.drop(offset - 1)
-  def parsed: String = input.take(offset - 1)
+  def unParsed: String = input.drop(offset)
+  def parsed: String = input.take(offset)
 
   def +(n: Int) = copy(offset = offset + n)
 }
 
-case class ParserState(location: Location) {
+case class ParserState(location: Location, isCommitted: Boolean = true) {
 
-  def +(n: Int) = ParserState(location + n)
+  def +(n: Int) = this.copy(location = location + n)
 
 }

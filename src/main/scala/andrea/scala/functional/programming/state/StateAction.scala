@@ -47,11 +47,16 @@ case class StateAction[State, +T](run: (State) => (T, State)) {
   def both[S](other: StateAction[State, S]): StateAction[State, (T, S)] = map2(other)((_, _))
 
   /**
+    * Same as both.
+    */
+  def **[S](other: StateAction[State, S]): StateAction[State, (T, S)] = map2(other)((_, _))
+
+  /**
     * Combines two actions but it only retains the value of the other action.
     * However the first action will still affect the state
     * @return
     */
-  def >>[S](other: StateAction[State, S]): StateAction[State, S] = map2(other){case (_, s) => s}
+  def >*[S](other: StateAction[State, S]): StateAction[State, S] = map2(other){case (_, s) => s}
 
   /**
     * Given a state runs the action and extracts the value

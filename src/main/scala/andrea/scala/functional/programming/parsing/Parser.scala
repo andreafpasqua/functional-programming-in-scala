@@ -10,12 +10,20 @@ import scala.util.matching.Regex
 
 case class Parser[+T](action: StateAction[ParserState, Either[ParserError, T]]) {
 
+  /**
+    * Given a string s, it uses it as an input to the parser. Note
+    * that the state is set as committed by default.
+    */
   def run(s: String): Either[ParserError, T] = {
-    val input = ParserState(Location(s, 0))
+    val input = ParserState(Location(s, 0), isCommitted=true)
     action.runAndGetValue(input)
   }
 }
 
+/**
+  * An implementation of Parsers
+  * Exercise 9.12
+  */
 object Parser extends Parsers[Parser] {
 
   /**
@@ -33,7 +41,7 @@ object Parser extends Parsers[Parser] {
   /**
     * Returns a parser for just the part of the input string that
     * this parsed successfully if any
-    * Exercise 9.9
+    * Exercise 9.13
     */
   def slice[T](p: Parser[T]): Parser[String] = Parser(
     p.action.both(StateAction.getState).map {
@@ -45,7 +53,7 @@ object Parser extends Parsers[Parser] {
   /**
     * Auxiliary functions for modifying the error stack
     * of a parser remapping it with f
-    * Exercise 9.9
+    * Exercise 9.10
     */
   private def modifyStack[T](p: Parser[T])
                             (f: List[(Location, String)] => List[(Location, String)])
@@ -53,39 +61,48 @@ object Parser extends Parsers[Parser] {
 
   /**
     * Attaches a specified error message s to this
-    * Exercise 9.9
+    * Exercise 9.10
     */
-  def label[T](p: Parser[T])(s: String): Parser[T] = modifyStack(p) {
+  def label[T](s: String)(p: Parser[T]): Parser[T] = modifyStack(p) {
+    case Nil => Nil
     case (loc, msg) :: tail => (loc, s) :: tail
   }
 
   /**
     * Adds a specified error message s to to the stack of this without
     * erasing previous labels
-    * Exercise 9.9
+    * Exercise 9.10
     */
-  def scope[T](p: Parser[T])(s: String): Parser[T] = modifyStack(p) {
+  def scope[T](s: String)(p: Parser[T]): Parser[T] = modifyStack(p) {
+    case Nil => Nil
     case (loc, msg) :: tail => (loc, s) :: (loc, msg) :: tail
   }
 
   /**
-    * Marks this (and anything built from this without branching, e.g.
-    * without or) as an attempt, meaning that if the parsing fails it
-    * switches to the other branch without executing the remainder
+    * When branching occurs，i.e when there is an or, it marks p
+    * as an attempt meaning that if the parsing fails it switches
+    * to the other branch, otherwise it returns a result. Anything built
+    * from p without branching, inherits the attempt.
+    * Exercise 9.10
     */
-  def attempt[T](p: Parser[T]): Parser[T] = ???
+  def attempt[T](p: Parser[T]): Parser[T] = {
+    val action =
+      StateAction.modifyState[ParserState](state => state.copy(isCommitted = false)) >*
+        p.action
+    Parser(action)
+  }
 
   /**
     * Reports only the error that occurred last,
     * i.e. the top of the stack
-    * Exercise 9.9
+    * Exercise 9.11
     */
   def latest[T](p: Parser[T]): Parser[T] = modifyStack(p)(_.take(1))
 
   /**
     * Returns the error with the furthest position,
     * i.e. the one with the largest position
-    * Exercise 9.9
+    * Exercise 9.11
     */
   def furthest[T](p: Parser[T]): Parser[T] = modifyStack(p) {
     stack => List(stack.maxBy {case (location, _) => location.offset})
@@ -94,11 +111,25 @@ object Parser extends Parsers[Parser] {
   /**
     * Construct a parser that acts like this but if this fails acts on
     * the same input like other
-    * Exercise 9.9
+    * Exercise 9.10
     */
   def or[T](p: Parser[T], other: => Parser[T]): Parser[T] = Parser(
+    (StateAction.getState ** p.action ** StateAction.getState).flatMap {
+      case ((before, Left(_)), after) if !after.isCommitted => // left branch failed uncommitted
+        StateAction.setState(before) >* other.action
+      case ((_, result), _) => // left branch succeeded or failed committed
+        StateAction.unit(result)
+    }
+  )
+
+  /**
+    * Construct a parser that acts like this but if this fails acts on
+    * the same input like other
+    * Exercise 9.9
+    */
+  def orUncommitted[T](p: Parser[T], other: => Parser[T]): Parser[T] = Parser(
     StateAction.getState.both(p.action).flatMap {
-      case (s, Left(_)) => StateAction.setState(s) >> other.action
+      case (s, Left(_)) => StateAction.setState(s) >* other.action
       case (_, t@Right(_)) => StateAction.unit(t)
     }
   )
@@ -107,11 +138,15 @@ object Parser extends Parsers[Parser] {
     * Delays evaluation of the parser p
     * Exercise 9.5
     */
-  def delay[T](p: => Parser[T]): Parser[T] = Parser(p.action)
+  def delay[T](p: => Parser[T]): Parser[T] = Parser(
+    StateAction(
+      (state: ParserState) => p.action.run(state)
+    )
+  )
 
   /**
     * A parser that returns a string when fed to it.
-    * Exercise 9.9
+    * Exercise 9.13
     */
   def string(s: String): Parser[String] = {
     val action = StateAction(
@@ -122,7 +157,7 @@ object Parser extends Parsers[Parser] {
           case -1 if s.length <= unParsed.length => // parsed successfully
             (Right(s), state + s.length)
           case index => //input differs
-            val errorLoc = if (index == -1) unParsed.length else index + s.length
+            val errorLoc = if (index == -1) unParsed.length else index
             val error = (loc + errorLoc, s"input differs from expected string $s")
             (Left(ParserError(List(error))), state + errorLoc)
         }
@@ -134,7 +169,7 @@ object Parser extends Parsers[Parser] {
   /**
     * A parser that returns a string fed to it when it matches
     * the regular expression r
-    * Exercise 9.9
+    * Exercise 9.13
     */
   def regex(r: Regex): Parser[String] = {
     val action = StateAction(

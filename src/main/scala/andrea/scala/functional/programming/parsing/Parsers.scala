@@ -1,7 +1,6 @@
 package andrea.scala.functional.programming.parsing
 
 import scala.util.matching.Regex
-import andrea.scala.functional.programming.either.Either
 
 /**
   * Created by andreapasqua on 10/24/2016.
@@ -28,18 +27,19 @@ trait Parsers[Parser[+_]] {
   /**
     * Attaches a specified error message s to this
     */
-  def label[T](p: Parser[T])(s: String): Parser[T]
+  def label[T](s: String)(p: Parser[T]): Parser[T]
 
   /**
     * Adds a specified error message s to to the stack of this without
     * erasing previous labels
     */
-  def scope[T](p: Parser[T])(s: String): Parser[T]
+  def scope[T](s: String)(p: Parser[T]): Parser[T]
 
   /**
-    * Marks this (and anything built from this without branching, e.g.
-    * without or) as an attempt, meaning that if the parsing fails it
-    * switches to the other branch without executing the remainder
+    * When branching occurs，i.e when there is an or, it marks p
+    * as an attempt meaning that if the parsing fails it switches
+    * to the other branch, otherwise it returns a result. Anything built
+    * from p without branching, inherits the attempt.
     */
   def attempt[T](p: Parser[T]): Parser[T]
 
@@ -204,9 +204,9 @@ trait Parsers[Parser[+_]] {
 
     def slice: Parser[String] = self.slice(p)
 
-    def label(s: String): Parser[T] = self.label[T](p)(s)
+    def label(s: String): Parser[T] = self.label[T](s)(p)
 
-    def scope(s: String): Parser[T] = self.scope[T](p)(s)
+    def scope(s: String): Parser[T] = self.scope[T](s)(p)
 
     def attempt: Parser[T] = self.attempt[T](p)
 
