@@ -135,6 +135,7 @@ trait Parsers[Parser[+_]] {
     * Runs this on the input string and then other on what is left. Returns
     * both outputs as a tuple or a failure in all other cases.
     * Exercise 9.1
+    * Exercise 9.7
     */
   def product[T, S](p: Parser[T], other: => Parser[S]): Parser[(T, S)] =
     map2(p, other)((_, _))
@@ -178,6 +179,7 @@ trait Parsers[Parser[+_]] {
   /**
     * Parses a single digit if it is followed by as many instances of the
     * character c
+    * Exercise 9.6
     */
   def numFollowedByAsMany(c: Char): Parser[Int] =
     for {

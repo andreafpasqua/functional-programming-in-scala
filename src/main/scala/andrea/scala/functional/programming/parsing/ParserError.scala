@@ -1,19 +1,38 @@
 package andrea.scala.functional.programming.parsing
 
+import andrea.scala.functional.programming.parsing.ParserResult.Stack
+import andrea.scala.functional.programming.either.{Either, Left, Right}
+
+
 /**
   * Created by andreapasqua on 10/27/2016.
   */
 
-
-case class ParserError(stack: List[(Location, String)]) {
+case class ParserResult[+T](get: Either[ParserError, T]) {
 
   /**
-    * Modifies the stack by mapping it through f
+    * Returns a new Result by mapping the error stack (if any) using f
     */
-  def map(f: List[(Location, String)] => List[(Location, String)]): ParserError =
-    ParserError(f(stack))
+  def mapError(f: Stack => Stack): ParserResult[T] =
+    ParserResult(get.left.map(e => ParserError(f(e.stack))))
 
+  /**
+    * Returns a new Result by mapping the value (if any) using f
+    */
+  def mapValue[S](f: T => S): ParserResult[S] =
+    ParserResult(get.right.map(f))
+
+  /**
+    * Adds a new error at the top of the stack,
+    * consisting of location and error message,
+    */
+  def push(loc: Location, msg: String): ParserResult[T] = mapError((loc, msg) :: _)
+
+  def isSuccess = get.isRight
+  def isFailure = get.isLeft
 }
+
+case class ParserError(stack: Stack)
 
 case class Location(input: String, offset: Int) {
   lazy val line = input.slice(0, offset + 1).count(_ == '\n') + 1
@@ -26,6 +45,16 @@ case class Location(input: String, offset: Int) {
 
   def +(n: Int) = copy(offset = offset + n)
 }
+
+object ParserResult {
+  type Stack = List[(Location, String)]
+
+  def error[T](loc: Location, msg: String) =
+    ParserResult[T](Left(ParserError(List((loc, msg)))))
+
+  def result[T](t: T) = ParserResult(Right(t))
+}
+
 
 case class ParserState(location: Location, isCommitted: Boolean = true) {
 

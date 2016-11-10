@@ -1,8 +1,7 @@
 package andrea.scala.functional.programming.parsing
 
 import andrea.scala.functional.programming.testing.{Prop, Sampler}
-import andrea.scala.functional.programming.either.{Either, Left, Right}
-import andrea.scala.functional.programming.state.StateAction
+import andrea.scala.functional.programming.either.{Left, Right}
 
 /**
   * Created by andrea on 10/25/16.
