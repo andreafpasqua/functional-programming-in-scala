@@ -8,28 +8,40 @@ import andrea.scala.functional.programming.either.{Either, Left, Right}
   * Created by andreapasqua on 10/27/2016.
   */
 
-case class ParserResult[+T](get: Either[ParserError, T]) {
+case class ParserResult[+T](result: Either[ParserError, T]) {
 
   /**
     * Returns a new Result by mapping the error stack (if any) using f
     */
   def mapError(f: Stack => Stack): ParserResult[T] =
-    ParserResult(get.left.map(e => ParserError(f(e.stack))))
+    ParserResult(result.left.map(e => ParserError(f(e.stack))))
 
   /**
     * Returns a new Result by mapping the value (if any) using f
     */
   def mapValue[S](f: T => S): ParserResult[S] =
-    ParserResult(get.right.map(f))
+    ParserResult(result.right.map(f))
 
   /**
     * Adds a new error at the top of the stack,
-    * consisting of location and error message,
+    * consisting of the same location as the top error but with new
+    * error message msg
     */
-  def push(loc: Location, msg: String): ParserResult[T] = mapError((loc, msg) :: _)
+  def push(msg: String): ParserResult[T] = mapError {
+    case Nil => Nil
+    case (loc, s) :: list => (loc, msg) :: (loc, s) :: list
+  }
 
-  def isSuccess = get.isRight
-  def isFailure = get.isLeft
+  def changeTopMessage(msg: String): ParserResult[T] = mapError {
+    case Nil => Nil
+    case (loc, _) :: list => (loc, msg) :: list
+  }
+
+  def isSuccess = result.isRight
+  def isFailure = result.isLeft
+
+  
+
 }
 
 case class ParserError(stack: Stack)

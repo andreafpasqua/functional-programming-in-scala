@@ -1,6 +1,6 @@
 package andrea.scala.functional.programming.parsing
 
-import andrea.scala.functional.programming.either.{Either, Left, Right}
+import andrea.scala.functional.programming.either.{Left, Right}
 import andrea.scala.functional.programming.parsing.ParserResult.Stack
 import andrea.scala.functional.programming.state.StateAction
 
@@ -36,7 +36,7 @@ object Parser extends Parsers[Parser] {
     */
   def flatMap[T, S](p: Parser[T], f: T => Parser[S]): Parser[S] = Parser(
     p.action.flatMap(
-      _.get match {
+      _.result match {
         case l @ Left(_) => StateAction.unit(ParserResult(l))
         case Right(t) => f(t).action
       }
@@ -67,23 +67,14 @@ object Parser extends Parsers[Parser] {
     * Attaches a specified error message s to this
     * Exercise 9.10
     */
-  def label[T](s: String)(p: Parser[T]): Parser[T] = modifyStack(p) {
-    case Nil => Nil
-    case (loc, msg) :: tail => (loc, s) :: tail
-  }
+  def label[T](s: String)(p: Parser[T]): Parser[T] = Parser(p.action.map(_.changeTopMessage(s)))
 
   /**
     * Adds a specified error message s to to the stack of this without
     * erasing previous labels
     * Exercise 9.10
     */
-  def scope[T](s: String)(p: Parser[T]): Parser[T] =
-    p.action.flatMap(result => result.push()
-
-    modifyStack(p) {
-    case Nil => Nil
-    case (loc, msg) :: tail => (loc, s) :: (loc, msg) :: tail
-  }
+  def scope[T](s: String)(p: Parser[T]): Parser[T] = Parser(p.action.map(_.push(s)))
 
   /**
     * When branching occurs，i.e when there is an or, it marks p
@@ -137,7 +128,7 @@ object Parser extends Parsers[Parser] {
   def orUncommitted[T](p: Parser[T], other: => Parser[T]): Parser[T] = Parser(
     StateAction.getState.both(p.action).flatMap {
       case (s, res) if res.isSuccess => StateAction.setState(s) >* other.action
-      case (_, t@Right(_)) => StateAction.unit(t)
+      case (s, res) => StateAction.unit(res)
     }
   )
 
