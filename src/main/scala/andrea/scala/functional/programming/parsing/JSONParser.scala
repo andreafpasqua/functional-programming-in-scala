@@ -20,6 +20,8 @@ object JSONParser {
   case class JArray(get: IndexedSeq[JSON]) extends JSON
   case class JObject(get: Map[String, JSON]) extends JSON
 
+  val jParser: Parser[JSON] = jNull | jNumber | jString | jBool | jArray | jObject
+
   // you need to use the constructor because strings have another implicit map
   val jNull: Parser[JSON] = string("null").map(_ => JNull)
 
@@ -42,8 +44,6 @@ object JSONParser {
     val jsonList = char('{') >* splitIn(kVPair) *< '}'
     jsonList.map(list => JObject(list.toMap))
   }
-
-  val jParser: Parser[JSON] = jNull | jNumber | jString | jBool | jArray | jObject
 
   /**
     * Splits a c separated sequence of string that can be parsed by p into a list of parsed objects
