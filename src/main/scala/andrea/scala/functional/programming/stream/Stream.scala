@@ -71,6 +71,7 @@ sealed trait Stream[+T] {
     (t, tt) => if (p(t)) Stream.cons(t, tt) else tt
   )
 
+
   /**
     * Appends two streams. It uses foldRight so elements of either
     * stream are accesses only as they become necessary.
