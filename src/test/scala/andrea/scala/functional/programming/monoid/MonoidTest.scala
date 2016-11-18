@@ -1,40 +1,86 @@
 package andrea.scala.functional.programming.monoid
 
-import andrea.scala.functional.programming.monoid.Monoid.MonoidLaws
-import andrea.scala.functional.programming.testing.Sampler
+import andrea.scala.functional.programming.state.SimpleRandomState
+import andrea.scala.functional.programming.testing.{Prop, Sampler}
 
 /**
-  * Created by andreapasqua on 11/07/2016.
+  * Created by andrea on 11/16/16.
   */
+
 object MonoidTest extends App {
 
-  implicit val alphabet = "abcdefghijklmnopqrstuvwxyz".toVector
+  val maxSize = 100
+  val numSamples = 1000
+  val state = SimpleRandomState(System.currentTimeMillis())
+  implicit val alphabet = "abcdef".toVector
 
-  val optionSampler: Sampler[Option[Int]] = for {
-    boolean <- Sampler.boolean
-    int <- Sampler.intInInterval(-100, 101)
-  } yield if (boolean) Some(int) else None
+  /**
+    * Exercise 10.4
+    */
+  println("* Test that integer with additions are a monoid")
+  val intAdditionIsMonoid: Prop = Monoid.monoidLaws(Monoid.intAddition, Sampler.intInInterval(-100, 100))
+  assert(intAdditionIsMonoid.check(maxSize, numSamples, state).notFalsified)
 
-  val endoSampler: Sampler[(Int) => Int] =
-    Sampler.function(Sampler.intInInterval(-100, 101), Sampler.intInInterval(-100, 101))
+  /**
+    * Exercise 10.4
+    */
+  println("* Test that integer with multiplication are a monoid")
+  val intMultiplicationIsMonoid: Prop = Monoid.monoidLaws(Monoid.intMultiplication, Sampler.intInInterval(-100, 100))
+  assert(intMultiplicationIsMonoid.check(maxSize, numSamples, state).notFalsified)
 
-  val stringSampler: Sampler[String] = Sampler.string(30)
+  /**
+    * Exercise 10.4
+    */
+  println("* Test that booleans with or are a monoid")
+  val booleanOrIsMonoid: Prop = Monoid.monoidLaws(Monoid.booleanOr, Sampler.boolean)
+  assert(booleanOrIsMonoid.check(maxSize, numSamples, state).notFalsified)
 
-  val intSampler: Sampler[Int] = Sampler.intInInterval(-100, 100)
+  /**
+    * Exercise 10.4
+    */
+  println("* Test that booleans with and are a monoid")
+  val booleanAndIsMonoid: Prop = Monoid.monoidLaws(Monoid.booleanAnd, Sampler.boolean)
+  assert(booleanAndIsMonoid.check(maxSize, numSamples, state).notFalsified)
 
-  println("* Test op associavity on options")
-  assert(MonoidLaws.opLaw(optionSampler)(Monoid.MonoidExamples.optionMonoid).check(numSamples = 1000).notFalsified)
-  println("* Test zero property on options")
-  assert(MonoidLaws.zeroLaw(optionSampler)(Monoid.MonoidExamples.optionMonoid).check(numSamples = 1000).notFalsified)
+  /**
+    * Exercise 10.4
+    */
+  println("* Test that strings with concatenation are a monoid")
+  val stringMonoidIsMonoid: Prop = Monoid.monoidLaws(Monoid.stringMonoid, Sampler.string(10))
+  assert(stringMonoidIsMonoid.check(maxSize, numSamples, state).notFalsified)
 
-//  println("* Test op associavity on endofunctions")
-////  assert(MonoidLaws.opLaw(endoSampler)(Monoid.MonoidExamples.endoMonoid).check(numSamples = 10).notFalsified)
-//  println("* Test zero property on endofunctions")
-//  assert(MonoidLaws.zeroLaw(endoSampler)(Monoid.MonoidExamples.endoMonoid).check(numSamples = 100).notFalsified)
-//
-  println("* Test op associavity on strings")
-    assert(MonoidLaws.opLaw(stringSampler)(Monoid.MonoidExamples.stringMonoid).check(numSamples = 1000).notFalsified)
-  println("* Test zero property on strings")
-  assert(MonoidLaws.zeroLaw(stringSampler)(Monoid.MonoidExamples.stringMonoid).check(numSamples = 1000).notFalsified)
+  /**
+    * Exercise 10.4
+    */
+  println("* Test that lists with appending are a monoid")
+  val listSampler = Sampler.intInInterval(-100, 100).listOf(Sampler.intInInterval(0, 5))
+  val listMonoidIsMonoid: Prop = Monoid.monoidLaws(Monoid.listMonoid[Int], listSampler)
+  assert(listMonoidIsMonoid.check(maxSize, numSamples, state).notFalsified)
+  /**
+    * Note that you get stack-overflow from the Sampler if you make the list too big. This is
+    * on account of filter using foldRight. But without it the performance is very slow
+    */
+
+  /**
+    * Exercise 10.4
+    */
+  println("* Test that options with orElse are a monoid")
+  val optionSampler = Sampler.boolean.flatMap(
+    bool =>
+      if (bool)
+        Sampler.intInInterval(-100, 100).map(Some(_))
+      else Sampler.unit(None)
+  )
+  val optionMonoidIsMonoid: Prop = Monoid.monoidLaws(Monoid.optionMonoid[Int], optionSampler)
+  assert(optionMonoidIsMonoid.check(maxSize, numSamples, state).notFalsified)
+
+  println("* Test foldMap, foldLeftViaFoldMap")
+  val strings = List("a", "ab", "abc", "abcd", "abcde", "abcdef", "abcdefg")
+  val ints = List(1, 2, 3, 4, 5, 6, 7)
+  assert(Monoid.foldMap(strings, Monoid.intAddition)(_.length) == strings.foldLeft(0)(_ + _.length))
+  assert(Monoid.foldMap(ints, Monoid.stringMonoid)(_.toString) == ints.foldLeft("")(_ ++ _.toString))
+  assert(Monoid.foldLeftViaFoldMap(strings)(0)(_ + _.length) == strings.foldLeft(0)(_ + _.length))
+  assert(Monoid.foldLeftViaFoldMap(ints)("")(_ ++ _.toString) == ints.foldLeft("")(_ ++ _.toString))
+
 
 }

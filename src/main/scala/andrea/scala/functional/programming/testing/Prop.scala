@@ -35,7 +35,14 @@ case class Prop(run: (Prop.MaxTestSize, Prop.SampleSize, RandState) => Prop.Chec
     (maxTestSize, sampleSize, state) => {
       val thisResult = run(maxTestSize, sampleSize, state)
       if (thisResult.isFalsified) thisResult
-      else other.run(maxTestSize, sampleSize, state)
+      else {
+        val otherResult = other.run(maxTestSize, sampleSize, state)
+        (thisResult, otherResult) match {
+          case (_, f @Prop.Falsified(_, _)) => f
+          case (Prop.Proved, Prop.Proved) => Prop.Proved
+          case _ => Prop.Passed
+        }
+      }
     }
   )
 

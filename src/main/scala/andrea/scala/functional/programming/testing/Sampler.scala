@@ -103,10 +103,6 @@ case class Sampler[+T](sample: RandAction[T], population: Option[Population[T]] 
 
 }
 
-
-
-
-
 object Sampler {
 
   /**

@@ -87,6 +87,7 @@ sealed trait Stream[+T] {
     case Cons(_, tl) => tl().filter(p)
   }
 
+
   /**
     * Appends two streams. It uses foldRight so elements of either
     * stream are accesses only as they become necessary.
