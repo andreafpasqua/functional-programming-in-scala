@@ -88,13 +88,13 @@ trait Parsers[Parser[+_]] {
     */
 
   /**
-    * a parser that recognizes the same object as this and returns a list of
-    * however many copies of that object are at the beginning of the input
+    * a parser that recognizes the same string as this but parses however
+    * many copies of it there are at the beginning of the input
     * string.
     * Exercise 9.3
     */
   def many[T](p: Parser[T]): Parser[List[T]] =
-    or(map2(p, many(p))(_ :: _), succeed(Nil))
+    or(attempt(map2(p, many(p))(_ :: _)), succeed(Nil))
 
   /**
     * The same as many, but failing if there are no initial substrings of
@@ -156,7 +156,8 @@ trait Parsers[Parser[+_]] {
   /**
     * A parser that returns a character when fed to it as a string
     */
-  def char(c: Char): Parser[Char] = map[String, Char](string(c.toString), _.charAt(0))
+  def char(c: Char): Parser[Char] = label(s"input differs from expected character $c")(
+    map[String, Char](string(c.toString), _.charAt(0)))
 
   /**
     * A parser that recognizes character c and counts how many times in a row it

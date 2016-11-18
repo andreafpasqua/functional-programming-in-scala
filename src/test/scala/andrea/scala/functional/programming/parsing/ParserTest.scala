@@ -143,7 +143,8 @@ object ParserTest extends App {
   assert(string("abc").map(_.length).run("abcdef").getResult ==3)
   assert(string("abc").map(_.length).slice.run("abcdef").getResult == "abc")
   assert(regex("""[a-d][i,o]g""".r).slice.run("dog and cat").getResult == "dog")
-  println(string("abc").map(_.length).slice.run("abCdef").getStack.head._1.offset == 2)
+  assert(string("abc").map(_.length).slice.run("abCdef").getStack.head._1.offset == 2)
+  assert(product(string("abc"), slice(string("def"))).run("abcdef").getResult == ("abc", "def"))
 
   println("* Test label")
   assert {
@@ -160,7 +161,6 @@ object ParserTest extends App {
       scopedError.getStack.head._2 == "scope message" &&
       scopedError.getStack.tail.head._2 == "new label"
   }
-
   val scopedParser = scope("scope message")(
     label("first label")(string("ciao")) **
       label("second label")(string(" ciao"))
@@ -193,9 +193,58 @@ object ParserTest extends App {
   assert(uncommittedOr.run("hello").getResult == "hello")
   assert(uncommittedOr.run("cia0 ciao").isError)
 
-  //  println("* Test sequence")
-//  val sequenceParser = sequence(List[Parser[String]]("ciao", " ", "5", " ", "ciao"))
-//  assert(sequenceParser.run("ciao 5 ciao") == Right(List("ciao", " ", "5", " ", "ciao")))
-//  assert(sequenceParser.run("ciao 6 ciao").left.get.stack.head._1.offset == 0)
+  println("* Test latest")
+  assert(latest(uncommittedOr).run("cia0 ciao").getStack == uncommittedOr.run("cia0 ciao").getStack.take(1))
+  assert(latest(committedOr).run("cia0 ciao").getStack == uncommittedOr.run("cia0 ciao").getStack.take(1))
+
+  println("* Test furthest")
+  assert(furthest(uncommittedOr).run("cia0 ciao").getStack.head._1.offset == 3)
+
+  println("* Test many, many1, listOfN")
+  assert(many(char('c')).run("dddd").getResult.isEmpty)
+  assert(many(char('c')).run("ccd").getResult == List('c', 'c'))
+  assert(many1(char('c')).run("cddd").getResult == List('c'))
+  assert(many1(char('c')).run("dddd").getStack.head._1.offset == 0)
+  assert(listOfN(char('c'), 3).run("cccddd").getResult == List('c', 'c', 'c'))
+  assert(listOfN(char('c'), 3).run("ccddd").getStack.head._1.offset == 2)
+
+  println("* Test map")
+  assert(string("ciao").map(_.length).run("ciao ciao").getResult == 4)
+  assert(string("ciao").map(_.length).run("cia0 ciao").getStack.head._1.offset == 3)
+
+  println("* Test map2")
+  val map2Parser = map2(string("ciao"), string(" ciao"))(_.length + _.length)
+  assert(map2Parser.run("ciao ciao").getResult == 9)
+  assert(map2Parser.run("cia0 ciao").getStack.head._1.offset == 3)
+  assert(map2Parser.run("ciao cia0").getStack.head._1.offset == 8)
+
+  println("* Test product")
+  val productParser = product(string("ciao"), string(" ciao"))
+  assert(productParser.run("ciao ciao").getResult == ("ciao", " ciao"))
+  assert(productParser.run("cia0 ciao").getStack.head._1.offset == 3)
+  assert(productParser.run("ciao cia0").getStack.head._1.offset == 8)
+  assert(productParser.run(" ciaociao").getStack.head._1.offset == 0)
+
+  println("* Test sequence")
+  val sequenceParser = sequence(List[Parser[String]]("ciao", " ", "5", " ", "ciao"))
+  assert(sequenceParser.run("ciao 5 ciao").getResult == List("ciao", " ", "5", " ", "ciao"))
+  assert(sequenceParser.run("ciao 6 ciao").getStack.head._1.offset == 5)
+
+  println("* Test char")
+  assert(char('c').run("dddd").getStack.head._1.offset == 0)
+  assert(char('c').run("ccd").getResult == 'c')
+
+  println("* Test countChar, countChar1, countTwoChars")
+  assert(countChar('c').run("ddddc").getResult == 0)
+  assert(countChar1('c').run("ddddc").getStack.head._1.offset == 0)
+  assert(countChar('c').run("cccd").getResult == 3)
+  assert(countChar1('c').run("cccd").getResult == 3)
+  val twoCharsParser = countTwoChars('c', 'd')
+  assert(twoCharsParser.run("dddcc").getResult == (0, 3))
+  assert(twoCharsParser.run("cccdd").getResult == (3, 2))
+  assert(twoCharsParser.run("eeefffcc").getStack.head._1.offset == 0)
+
+  //  println(ParserLaws.mapLaw(uncommittedOr).check(maxSize = 1, numSamples = 2))
+
 
 }

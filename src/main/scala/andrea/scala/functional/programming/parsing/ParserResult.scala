@@ -57,6 +57,18 @@ case class ParserError(stack: Stack) extends ParserResult[Nothing]{
     }
   )
 
+  /**
+    * Combines the stacks of this and other, putting the stack of other on top
+    */
+  def ++(other: ParserError): ParserError = ParserError(other.stack ++ stack)
+
+  override def toString: String =
+    "Parser Error Stack Track" +
+    stack.reverse.map {
+      case (loc, msg) => s"""\n\tUnable to parse character "${loc.input.charAt(loc.offset)}" at """ +
+        s"""offset ${loc.offset} of input "${loc.input}", because $msg"""
+    }.reduce(_ + _)
+
 }
 
 case class Location(input: String, offset: Int) {

@@ -37,8 +37,8 @@ object Parser extends Parsers[Parser] {
       case e @ ParserError(_) => StateAction.unit(e)
       case Success(t) => f(t).action
     }
-  )
 
+  )
 
   /**
     * Returns a parser for just the part of the input string that
@@ -46,9 +46,13 @@ object Parser extends Parsers[Parser] {
     * Exercise 9.13
     */
   def slice[T](p: Parser[T]): Parser[String] = Parser(
-    (p.action ** StateAction.getState).map {
-      case (e @ParserError(_), _) => e
-      case (_, state) => ParserResult.success(state.location.parsed)
+    (StateAction.getState ** p.action ** StateAction.getState).map {
+      case ((_, e @ParserError(_)), _) => e
+      case ((before, _), after) =>
+        val offsetBefore = before.location.offset
+        val offsetAfter = after.location.offset
+        val slice = after.location.input.slice(offsetBefore, offsetAfter)
+        ParserResult.success(slice)
     }
   )
 
@@ -112,14 +116,17 @@ object Parser extends Parsers[Parser] {
     * Exercise 9.10
     */
 
-  def or[T](p: Parser[T], other: => Parser[T]): Parser[T] = Parser(
-    (StateAction.getState ** p.action ** StateAction.getState).flatMap {
-      case ((before, ParserError(_)), after) if !after.isCommitted => // left branch failed uncommitted
-        StateAction.setState(before) >* other.action
-      case ((_, res), _) => // left branch succeeded or failed committed
-        StateAction.unit(res)
-    }
-  )
+  def or[T](p: Parser[T], other: => Parser[T]): Parser[T] =
+    scope("at least one or-branch failed to parse the input")(
+      Parser(
+        (StateAction.getState ** p.action ** StateAction.getState).flatMap {
+          case ((before, e@ParserError(_)), after) if !after.isCommitted => // left branch failed uncommitted
+           StateAction.setState(before) >* other.action.map(_.mapError(error => error ++ e))
+          case ((_, res), _) => // left branch succeeded or failed committed
+            StateAction.unit(res)
+        }
+      )
+    )
 
   /**
     * Construct a parser that acts like this but if this fails acts on
