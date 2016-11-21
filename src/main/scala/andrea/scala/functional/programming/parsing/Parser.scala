@@ -109,6 +109,18 @@ object Parser extends Parsers[Parser] {
     mapError(p)(
       e => ParserError(List(e.stack.maxBy {case (location, _) => location.offset})))
 
+  /**
+    * Makes p top-level, i.e. p will fail if after it has parsed the input string
+    * there are residual unparsed characters
+    */
+  def topLevel[T](p: Parser[T]): Parser[T] = {
+    val action = (p.action ** StateAction.getState).map {
+      case (Success(t), after) if  !after.finished => ParserResult.error(after.location,
+        "top-level parser did not reach the end of the input string")
+      case (result, _) => result
+    }
+    Parser(action)
+  }
 
   /**
     * Construct a parser that acts like this but if this fails acts on
@@ -165,7 +177,7 @@ object Parser extends Parsers[Parser] {
           case index => //input differs
             val errorLoc = if (index == -1) unParsed.length else index
             (ParserResult.error(loc + errorLoc,
-              s"input differs from expected string $s")
+              s"""input differs from expected string "$s"""")
               , state + errorLoc)
         }
       }
@@ -185,10 +197,11 @@ object Parser extends Parsers[Parser] {
         val firstMatch = r.findPrefixMatchOf(state.location.unParsed)
         firstMatch match {
           case None =>
-            (ParserResult.error(state.location, s"input does not match regular expression $r"),
+            (ParserResult.error(state.location, s"""input does not match regular expression "$r""""),
               state)
-          case Some(s) => (ParserResult.success(s.toString),
-            state + s.toString.length)
+          case Some(s) =>
+            (ParserResult.success(s.toString),
+              state + s.toString.length)
         }
       }
     )

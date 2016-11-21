@@ -65,8 +65,13 @@ case class ParserError(stack: Stack) extends ParserResult[Nothing]{
   override def toString: String =
     "Parser Error Stack Track" +
     stack.reverse.map {
-      case (loc, msg) => s"""\n\tUnable to parse character "${loc.input.charAt(loc.offset)}" at """ +
-        s"""offset ${loc.offset} of input "${loc.input}", because $msg"""
+      case (loc, msg) =>
+        val unParsedCharacter =
+          if (loc.offset < loc.input.length)
+            s"""character '${loc.input.charAt(loc.offset)}'"""
+          else "any character"
+        s"\n\tUnable to parse $unParsedCharacter at " +
+          s"""offset ${loc.offset} of input "${loc.input}", because $msg"""
     }.reduce(_ + _)
 
 }
@@ -81,6 +86,8 @@ case class Location(input: String, offset: Int) {
   def parsed: String = input.take(offset)
 
   def +(n: Int) = copy(offset = offset + n)
+  def finished: Boolean = unParsed == ""
+
 }
 
 object ParserResult {
@@ -99,5 +106,6 @@ case class ParserState(location: Location, isCommitted: Boolean = true) {
 
   def commit: ParserState = this.copy(isCommitted = true)
   def unCommit: ParserState = this.copy(isCommitted = false)
+  def finished: Boolean = location.finished
 
 }

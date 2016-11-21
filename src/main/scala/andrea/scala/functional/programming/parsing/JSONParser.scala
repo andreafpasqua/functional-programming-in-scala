@@ -20,17 +20,15 @@ object JSONParser {
   case class JArray(get: IndexedSeq[JSON]) extends JSON
   case class JObject(get: Map[String, JSON]) extends JSON
 
-  val jParser: Parser[JSON] = jNull | jNumber | jString | jBool | jArray | jObject
-
   // you need to use the constructor because strings have another implicit map
   val jNull: Parser[JSON] = string("null").map(_ => JNull)
 
   val jNumber: Parser[JSON] =
-    many("[0-9].".r).map(d => JNumber(d.reduce(_ + _).toDouble))
+    regex("""^[+-]?(\d*\.)?\d+""".r).map(d => JNumber(d.toDouble))
 
-  val jString: Parser[JSON] = ((char('"') >* """\w"&&[^"]""".r) *< '"').map(s => JString(s))
+  val jString: Parser[JSON] = ((char('"') >* """^[a-zA-Z0-9_\s]*""".r) *< '"').map(s => JString(s))
 
-  val jBool: Parser[JSON] = regex("[true, false]".r).map(
+  val jBool: Parser[JSON] = (attempt(string("true")) | string("false")).map(
     s => if (s == "true") JBool(true) else JBool(false)
   )
 
@@ -40,7 +38,7 @@ object JSONParser {
   }
 
   val jObject: Parser[JSON] = {
-    val kVPair = trim(jString).slice ** (char(':') >* trim(jParser))
+    val kVPair = trim(jString).map{case JString(s) => s} ** (char(':') >* trim(jParser))
     val jsonList = char('{') >* splitIn(kVPair) *< '}'
     jsonList.map(list => JObject(list.toMap))
   }
@@ -56,5 +54,11 @@ object JSONParser {
     * with p
     */
   def trim[T](p: Parser[T]): Parser[T] = many(" ") >* p *< many(" ")
+
+
+  def jParser: Parser[JSON] = attempt(jNull) | attempt(jNumber) | attempt(jString) |
+    attempt(jBool) | attempt(jArray) | jObject
+
+  val topParser: Parser[JSON] = topLevel(jParser)
 
 }

@@ -12,9 +12,11 @@ case class Population[+T](population: Stream[T], size: Int) {
     * Combines two populations into a single one.
     * Notice that if the two populations overlap there will be repetitions
     */
-  def ++[TT >: T](other: Population[TT]): Population[TT] =
-    Population(population.append(other.population), size + other.size)
-
+  def ++[TT >: T](other: Population[TT]): Population[TT] = {
+    val uncheckedSize = size + other.size
+    val checkedSize = if (uncheckedSize > 0 ) uncheckedSize else Integer.MAX_VALUE
+    Population(population.append(other.population), checkedSize)
+  }
 }
 /**
   * Generates samples from a population of the type T randomly, optionally it
@@ -32,7 +34,8 @@ case class Sampler[+T](sample: RandAction[T], population: Option[Population[T]] 
     */
   def forall(p: T => Boolean): Prop = Prop(
     (_, sampleSize, state) => population match {
-      case Some(Population(pop, size)) if size <= sampleSize => Sampler.falsify(pop, p).getOrElse(Prop.Proved)
+      case Some(Population(pop, size)) if size <= sampleSize =>
+        Sampler.falsify(pop, p).getOrElse(Prop.Proved)
       case _ =>
         val randomSample = getRandomSample(sampleSize, state)
         Sampler.falsify(randomSample, p).getOrElse(Prop.Passed)
@@ -151,9 +154,9 @@ object Sampler {
     */
   def string(maxLength: Int)
             (implicit alphabet: IndexedSeq[Char]): Sampler[String] =
-    intInInterval(0, alphabet.length)
-      .listOf(intInInterval(0, maxLength + 1))
-      .map(_.map(alphabet).mkString)
+    intInInterval(0, alphabet.length).listOf(
+      intInInterval(0, maxLength + 1)
+    ).map(_.map(alphabet).mkString)
 
   /**
     * Samples the space of functions from domain to coDomain. If both Samplers have
@@ -217,7 +220,8 @@ object Sampler {
         go(newResult, n - 1)
       }
     }
-    Population(go(Stream(List.empty[T]), n), math.pow(population.size, n).toInt)
+    val populationSize = math.pow(population.size, n).toInt
+    Population(go(Stream(List.empty[T]), n), populationSize)
   }
 
   /**

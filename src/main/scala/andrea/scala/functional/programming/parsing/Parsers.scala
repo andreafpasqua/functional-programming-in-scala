@@ -56,6 +56,12 @@ trait Parsers[Parser[+_]] {
   def furthest[T](p: Parser[T]): Parser[T]
 
   /**
+    * Makes p top-level, i.e. p will fail if after it has parsed the input string
+    * there are residual unparsed characters
+    */
+  def topLevel[T](p: Parser[T]): Parser[T]
+
+  /**
     * Construct a parser that acts like this but if this fails acts on
     * the same input like other
     */
@@ -156,7 +162,7 @@ trait Parsers[Parser[+_]] {
   /**
     * A parser that returns a character when fed to it as a string
     */
-  def char(c: Char): Parser[Char] = label(s"input differs from expected character $c")(
+  def char(c: Char): Parser[Char] = label(s"input differs from expected character '$c'")(
     map[String, Char](string(c.toString), _.charAt(0)))
 
   /**
