@@ -1,5 +1,7 @@
 package andrea.scala.functional.programming.stream
 
+import andrea.scala.functional.programming.option.{Option, Some, None}
+
 /**
   * Created by andrea on 10/6/16.
   */

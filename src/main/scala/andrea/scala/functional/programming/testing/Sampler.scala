@@ -1,23 +1,11 @@
 package andrea.scala.functional.programming.testing
 
-import andrea.scala.functional.programming.state.{RandState, StateAction, SimpleRandomState}
+import andrea.scala.functional.programming.state.{RandState, StateAction}
 import andrea.scala.functional.programming.state.StateAction._
 import andrea.scala.functional.programming.stream.Stream
-import andrea.scala.functional.programming.stream.Stream.{apply => _, _}
+import andrea.scala.functional.programming.option.{Some, None, Option}
 
 
-case class Population[+T](population: Stream[T], size: Int) {
-
-  /**
-    * Combines two populations into a single one.
-    * Notice that if the two populations overlap there will be repetitions
-    */
-  def ++[TT >: T](other: Population[TT]): Population[TT] = {
-    val uncheckedSize = size + other.size
-    val checkedSize = if (uncheckedSize > 0 ) uncheckedSize else Integer.MAX_VALUE
-    Population(population.append(other.population), checkedSize)
-  }
-}
 /**
   * Generates samples from a population of the type T randomly, optionally it
   * contains the entire population and its size.
@@ -25,35 +13,60 @@ case class Population[+T](population: Stream[T], size: Int) {
   * population in most cases.
   * Exercise 8.15
   */
-case class Sampler[+T](sample: RandAction[T], population: Option[Population[T]] = None) {
+case class Sampler[+T](sample: RandAction[T], population: Stream[Option[T]] = Stream(None)) {
 
   /**
     * Given a sampler generates the corresponding proposition that holds
     * only if all the samples generated for a given state and sample size
     * satisfy the property p
     */
-  def forall(p: T => Boolean): Prop = Prop(
-    (_, sampleSize, state) => population match {
-      case Some(Population(pop, size)) if size <= sampleSize =>
-        Sampler.falsify(pop, p).getOrElse(Prop.Proved)
-      case _ =>
-        val randomSample = getRandomSample(sampleSize, state)
-        Sampler.falsify(randomSample, p).getOrElse(Prop.Passed)
+  def forall(p: T => Boolean): Prop = {
+    /**
+      * given a stream of optional values it carries out numChecks checks that p holds
+      * for the values. It knows numSuccesses checks succeeded so far. If the stream ends
+      * then it returns the result specified by onEnd
+      */
+    @annotation.tailrec
+    def go(stream: Stream[Option[T]], numSuccesses: Int, numChecks: Int,
+           onEnd: Prop.CheckResult): Prop.CheckResult = {
+      if (stream.isEmpty) onEnd
+      else if (numChecks == 0) Prop.Passed
+      else stream.head match {
+        case None => Prop.Passed
+        case Some(t) =>
+          val boolEither = try {Right(p(t))} catch { case e: Exception => Left(e)}
+          boolEither match {
+            case Left(e) => Prop.Falsified(Sampler.buildMessageFromException(e, t), numSuccesses)
+            case Right(true) => go(stream.tail, numSuccesses + 1, numChecks - 1, onEnd)
+            case Right(false) => Prop.Falsified(t.toString, numSuccesses)
+          }
+      }
     }
-  )
+
+    Prop(
+      (_, sampleSize, state) =>
+        if (population.isEmpty || population.head.isEmpty) {
+          go(getRandomSample(state), 0, sampleSize, Prop.Passed)
+        }
+        else {
+            go(population, 0, sampleSize / 3, Prop.Proved) match {
+              case Prop.Passed => go(getRandomSample(state), sampleSize / 3, 2 * sampleSize / 3, Prop.Passed)
+              case result => result
+            }
+        }
+    )
+  }
 
   /**
-    * Given a random state state generates a random sample of sampleSize
+    * Given a random state state generates a random sample of infinite length, with each element
+    * wrapped in a Some
     */
-  def getRandomSample(sampleSize: Int, state: RandState) = unfold(state)(s => Some(sample.run(s))).take(sampleSize)
+  def getRandomSample(state: RandState) = Sampler.unfoldWithSome(state)(s => Some(sample.run(s)))
 
   /**
     * Maps samples generated to new values using f for the mapping
     */
-  def map[S](f: T => S): Sampler[S] = Sampler(
-    sample.map(f),
-    population.map {pop =>  Population(pop.population.map(f), pop.size)}
-  )
+  def map[S](f: T => S): Sampler[S] = Sampler(sample.map(f), population.map(_.map(f)))
 
   /**
     * given a function f that generates samples of s for a given t,
@@ -61,19 +74,15 @@ case class Sampler[+T](sample: RandAction[T], population: Option[Population[T]] 
     * sampled points doesn't change.
     * Exercise 8.6
     */
-  def flatMap[S](f: T => Sampler[S]): Sampler[S] = {
-
-    val newSample = sample.flatMap(t => f(t).sample)
-
-    val newPopulation = population.flatMap(
-      _.population.foldRight(
-        Some(Population(Stream.empty[S], 0)): Option[Population[S]]) {
-          case (_, None) => None
-          case (t, Some(cumulative)) => f(t).population.map(_ ++ cumulative)
-        }
+  def flatMap[S](f: T => Sampler[S]): Sampler[S] =
+    Sampler(
+      sample.flatMap(f(_).sample),
+      population.flatMap {
+        case Some(t) => f(t).population
+        case None => Stream(None)
+      }
     )
-    Sampler(newSample, newPopulation)
-  }
+
 
   /**
     * given a sampler of integers it constructs lists of length equal to the integers sampled
@@ -109,24 +118,25 @@ case class Sampler[+T](sample: RandAction[T], population: Option[Population[T]] 
 object Sampler {
 
   /**
+    * The same as unfold of s and f but it wraps the values returned into a Some
+    */
+  private def unfoldWithSome[T, S](s: S)(f: S => Option[(T, S)]): Stream[Option[T]] =
+    Stream.unfold(s)(f).map(Some(_))
+
+  /**
     * Specialized chooseInInterval to integers. Requires a numSamples
     * Exercise 8.4
     */
-  def intInInterval(lb: Int, ub: Int): Sampler[Int] =
-    Sampler(
+  def intInInterval(lb: Int, ub: Int): Sampler[Int] = Sampler(
       nextNonNegativeIntLessThan(ub - lb),
-      Some(Population(Stream.unfold(0)(n => if (n < ub - lb) Some((n, n + 1)) else None), ub - lb))
-    ).map(_ + lb)
+      unfoldWithSome(0)(n => if (n < ub - lb) Some((n, n + 1)) else None)
+  ).map(_ + lb)
 
   /**
     * Given a thunk it generates test samples all with the same value t
     * Exercise 8.5
     */
-  def unit[T](t: => T): Sampler[T] =
-    Sampler(
-      StateAction.unit[RandState, T](t),
-      Some(Population(Stream(t), 1))
-    )
+  def unit[T](t: => T): Sampler[T] = Sampler(StateAction.unit[RandState, T](t), Stream(Some(t)))
 
   /**
     * Generates booleans.
@@ -168,36 +178,15 @@ object Sampler {
   def function[T, S](domain: Sampler[T], coDomain: Sampler[S],
                      supportSize: Int = 100): Sampler[T => S] = {
 
-    val functionMap = domain.population.map {
-      case Population(population, size) =>
-        for {
-          coSupport <- Sampler.listOfN(coDomain, size)
-        } yield population.toList.zip(coSupport).toMap
-    }.getOrElse { // if the population is not specified, sample
-      for {
-        defaultValue <- coDomain
-        support <- Sampler.listOfN(domain, supportSize)
-        coSupport <- Sampler.listOfN(coDomain, supportSize)
-      } yield support.zip(coSupport).toMap.withDefaultValue(defaultValue)
-    }
-    functionMap.map(map => (t: T) => map(t))
+    val mapSampler = for {
+      defaultValue <- coDomain
+      coSupport <- Sampler.listOfN(coDomain, supportSize)
+      support <- Sampler.listOfN(domain, supportSize)
+    } yield support.distinct.zip(coSupport).toMap.withDefaultValue(defaultValue)
+
+    mapSampler.map(map => (t: T) => map(t))
   }
 
-  /**
-    * Given a sample (exhaustive or not) it checks if the predicate p applies to
-    * all examples and returns a CheckResult, as either Falsified or Passed.
-    */
-  def falsify[T](samples: Stream[T], p: T => Boolean): Option[Prop.CheckResult] = {
-    val outcomes = samples.zip(from(0)).map {
-      case (t, count) => try {
-        if (p(t)) Prop.Passed else Prop.Falsified(t.toString, count + 1)
-      }
-      catch {
-        case e: Exception => Prop.Falsified(buildMessageFromException(e, t), count + 1)
-      }
-    }
-    outcomes.find(_.isFalsified)
-  }
 
   private def buildMessageFromException[T](e: Exception, t: T): String =
     s"test case $t\ngenerated an exception ${e.getMessage}\nwith stack trace:\n" +
@@ -207,21 +196,20 @@ object Sampler {
     * Given a population of type T, it constructs the full population for lists of length
     * n of type T elements
     */
-  private def getPopulationForList[T](population: Population[T], n: Int): Population[List[T]] = {
+  private def getPopulationForList[T](population: Stream[Option[T]], n: Int): Stream[Option[List[T]]] = {
 
     @annotation.tailrec
-    def go(result: Stream[List[T]], n: Int): Stream[List[T]] = {
+    def go(result: Stream[Option[List[T]]], n: Int): Stream[Option[List[T]]] = {
       if (n <= 0) result
       else {
         val newResult = for {
           list <- result
-          t <- population.population
-        } yield t :: list
+          t <- population
+        } yield t.map2(list)(_ :: _)
         go(newResult, n - 1)
       }
     }
-    val populationSize = math.pow(population.size, n).toInt
-    Population(go(Stream(List.empty[T]), n), populationSize)
+    go(Stream(Some(List.empty[T])), n)
   }
 
   /**
@@ -231,7 +219,7 @@ object Sampler {
     */
   def listOfN[T](sampler: Sampler[T], n: Int): Sampler[List[T]] = {
     val newSample = sequence(List.fill(n)(sampler.sample))
-    val newPopulation = sampler.population.map(getPopulationForList(_, n))
+    val newPopulation = getPopulationForList(sampler.population, n)
     Sampler(newSample, newPopulation)
   }
 

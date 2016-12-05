@@ -19,7 +19,7 @@ case class Prop(run: (Prop.MaxTestSize, Prop.SampleSize, RandState) => Prop.Chec
            ): Prop.CheckResult = {
     val result = run(maxSize, numSamples, state)
     result match {
-      case Prop.Falsified(msg, n) => println(s"Falsified after $n tests with message $msg")
+      case Prop.Falsified(msg, n) => println(s"Falsified after ${n + 1} tests with message $msg")
       case Prop.Passed => println(s"Passed after $numSamples tests")
       case Prop.Proved => println("Proved")
     }

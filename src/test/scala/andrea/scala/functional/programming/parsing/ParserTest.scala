@@ -130,6 +130,8 @@ object ParserTest extends App {
   assert(many1(char('c')).run("dddd").getStack.head._1.offset == 0)
   assert(listOfN(char('c'), 3).run("cccddd").getResult == List('c', 'c', 'c'))
   assert(listOfN(char('c'), 3).run("ccddd").getStack.head._1.offset == 2)
+  println("\t Notice that many is not stack-overflow safe")
+  // many(char('c')).run((1 to 10000).map(_ => "c").reduce(_ + _))
 
   println("* Test map")
   assert(string("ciao").map(_.length).run("ciao ciao").getResult == 4)
@@ -318,7 +320,7 @@ object ParserTest extends App {
     def stringLaw: Prop =
       Sampler.string(100).forall(s => string(s).run(s).getResult== s) &&
         Sampler.listOfN(Sampler.string(100), 2).forall {
-          case List(s1, s2) if s1 != s2 => string(s1).run(s2).isError
+          case List(s1, s2) if s1 != s2 => topLevel(string(s1)).run(s2).isError
           case _ => true
         }
 
@@ -331,7 +333,7 @@ object ParserTest extends App {
         t <- sampler
       } yield (s, t)
       stringAndValue.forall {
-        case (s, t) => succeed(t).run(s) == t
+        case (s, t) => succeed(t).run(s) == Success(t)
       }
     }
 
@@ -380,6 +382,27 @@ object ParserTest extends App {
 
   }
 
-  println(ParserLaws.mapLaw(uncommittedOr).check(maxSize = 1, numSamples = 100000))
+  println("** Test ParserLaws")
+  val maxSize = 100
+  val numSamples = 1000
+  val parser = string("ciao")
+  implicit val alphabet = "abcd".toVector
+
+  println("* Test mapLaw")
+  assert(ParserLaws.mapLaw(parser).check(maxSize, numSamples).notFalsified)
+
+  println("* Test stringLaw")
+  assert(ParserLaws.stringLaw.check(maxSize, numSamples).notFalsified)
+
+  println("* Test succeedLaw")
+  assert(ParserLaws.succeedLaw(Sampler.intInInterval(-100, 101)).check(maxSize, numSamples).notFalsified)
+
+  println("* Test productLaw")
+  val sampler = Sampler.string(100)
+  val functionSampler = Sampler.function(sampler, sampler)
+  println(ParserLaws.productLaw(parser, parser, parser)(functionSampler, functionSampler).check(maxSize, numSamples))
+
+  println("* Test labelLaw")
+  println(ParserLaws.labelLaw(parser)(Sampler.string(100)).check(maxSize, numSamples))
 
 }

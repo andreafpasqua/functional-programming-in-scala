@@ -23,21 +23,21 @@ object JSONParser {
   // you need to use the constructor because strings have another implicit map
   val jNull: Parser[JSON] = string("null").map(_ => JNull)
 
-  val jNumber: Parser[JSON] =
+  val jNumber: Parser[JNumber] =
     regex("""^[+-]?(\d*\.)?\d+""".r).map(d => JNumber(d.toDouble))
 
-  val jString: Parser[JSON] = ((char('"') >* """^[a-zA-Z0-9_\s]*""".r) *< '"').map(s => JString(s))
+  val jString: Parser[JString] = ((char('"') >* """^[a-zA-Z0-9_\s]*""".r) *< '"').map(s => JString(s))
 
-  val jBool: Parser[JSON] = (attempt(string("true")) | string("false")).map(
+  val jBool: Parser[JBool] = (attempt(string("true")) | string("false")).map(
     s => if (s == "true") JBool(true) else JBool(false)
   )
 
-  val jArray: Parser[JSON] = {
+  val jArray: Parser[JArray] = {
     val jsonList = char('[') >* splitIn(trim(jParser)) *< ']'
     jsonList.map(list => JArray(list.toVector))
   }
 
-  val jObject: Parser[JSON] = {
+  val jObject: Parser[JObject] = {
     val kVPair = trim(jString).map{case JString(s) => s} ** (char(':') >* trim(jParser))
     val jsonList = char('{') >* splitIn(kVPair) *< '}'
     jsonList.map(list => JObject(list.toMap))

@@ -83,7 +83,6 @@ object Parser extends Parsers[Parser] {
     * as an attempt meaning that if the parsing fails it switches
     * to the other branch, otherwise it returns a result. Anything built
     * from p without branching, inherits the attempt.
-    * Exercise 9.10
     */
   def attempt[T](p: Parser[T]): Parser[T] = {
     val action =
@@ -165,6 +164,7 @@ object Parser extends Parsers[Parser] {
   /**
     * A parser that returns a string when fed to it.
     * Exercise 9.13
+    * TODO: Exercise 9.14 label it properly
     */
   def string(s: String): Parser[String] = {
     val action = StateAction(

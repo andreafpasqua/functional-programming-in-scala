@@ -15,6 +15,16 @@ sealed trait Option[+A] {
     case Some(x) => Some(f(x))
   }
 
+
+  /**
+    * Extracts the content of the option. If there is no content it
+    * returns an exception
+    */
+  def get: A = this match {
+    case Some(a) => a
+    case None => throw new NoSuchElementException("get called on empty Option")
+  }
+
   /**
     * Extracts the content of the option if any. If there is no content it
     * returns the specified (and lazily evaluated) default value default
@@ -60,6 +70,8 @@ sealed trait Option[+A] {
     */
   def isEmpty: Boolean
 
+  def nonEmpty: Boolean = !isEmpty
+
 }
 
 object Option {
@@ -101,6 +113,6 @@ object Option {
 case object None extends Option[Nothing] {
   def isEmpty: Boolean = true
 }
-case class Some[A](get: A) extends Option[A] {
+case class Some[A](x: A) extends Option[A] {
   def isEmpty: Boolean = false
 }

@@ -62,6 +62,18 @@ case class ParserError(stack: Stack) extends ParserResult[Nothing]{
     */
   def ++(other: ParserError): ParserError = ParserError(other.stack ++ stack)
 
+  private def groupStack(stack: Stack): Map[Location, List[String]] =
+    stack.groupBy(_._1).mapValues(_.map(_._2))
+
+  def formatStack(stack: Stack): String =
+    if (stack.isEmpty) {
+      "no message"
+    }
+    else {
+      stack.toString
+    }
+//    "Parser Error Stack Track for input:\n\t"
+
   override def toString: String =
     "Parser Error Stack Track" +
     stack.reverse.map {
