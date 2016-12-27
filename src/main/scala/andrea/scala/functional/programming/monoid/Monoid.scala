@@ -18,6 +18,16 @@ trait Monoid[T] {
 object Monoid {
 
   /**
+    * Constructs the dual monoid of a monoid m, i.e. the monoid
+    * where the ordered of the elements in inverted
+    * when acting with op
+    */
+  def dual[T](m: Monoid[T]) = new Monoid[T] {
+    def op(t1: T, t2: T) = m.op(t2, t1)
+    def zero: T = m.zero
+  }
+
+  /**
     * Given a monoid m of type T and a sampler s for T, it constructs
     * a Proposition to test associativity and the existence of a unit
     * Exercise 10.4

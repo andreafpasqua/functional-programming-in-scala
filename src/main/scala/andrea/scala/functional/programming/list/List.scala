@@ -397,6 +397,14 @@ case class Cons[+A](h: A, t: List[A]) extends List[A] {
 
 object List {
 
+  /**
+    * Creates an empty list of type A
+    */
+  def empty[A]: List[A] = Nil
+
+  /**
+    * An apply method to construct a list by passing all the elements as.
+    */
   def apply[A](as: A*): List[A] =
     if (as.isEmpty) Nil
     else Cons(as.head, apply(as.tail: _*))
