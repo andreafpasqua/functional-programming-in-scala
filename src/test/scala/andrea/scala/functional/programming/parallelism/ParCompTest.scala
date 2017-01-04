@@ -1,10 +1,12 @@
 package andrea.scala.functional.programming.parallelism
 
+import org.scalatest.FunSuite
+
 /**
   * Created by andrea on 10/11/16.
   */
 
-object ParCompTest extends App {
+class ParCompTest extends FunSuite {
 
   /**
     * A fake executor service with a
