@@ -253,6 +253,12 @@ sealed trait List[+A] {
       (!isEmpty && tail.hasSubsequence(subList))
   }
 
+  /**
+    * generates a display string
+    */
+  override def toString: String = foldLeft("List(")(
+    (string, t) => s"$string${t.toString},"
+  ).dropRight(1) + ")"
 
   /**************** OLDER VERSIONS OF ROUTINES
     *
